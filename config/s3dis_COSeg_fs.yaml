@@ -1,6 +1,6 @@
 DATA:
   data_name: s3dis
-  data_root: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/S3DIS/Stanford3dDataset_v1.2_Aligned_Version/data
+  data_root: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/S3DIS/Stanford3dDataset_v1.2_Aligned_Version/scenes
   classes: 13
   fea_dim: 6
   voxel_size: 0.02
