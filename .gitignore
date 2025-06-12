@@ -97,3 +97,7 @@ data/
 *.sh
 logs
 val.py
+/.dockerignore
+/docker-compose.yml
+/Dockerfile
+/Dockerfile.local
