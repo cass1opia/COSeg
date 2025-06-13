@@ -5,6 +5,7 @@ Block Analysis Script for S3DIS/ScanNet Few-Shot Segmentation
 Usage:
     python analyze_block.py path/to/block.npy
     python analyze_block.py path/to/block.npy --dataset scannet
+    python analyze_block.py path/to/block.npy --no-plot
 """
 
 import argparse
@@ -31,7 +32,75 @@ def get_class_names(dataset):
         return []
 
 
-def analyze_block(block_path, dataset='s3dis'):
+def save_class_plot(xyz, labels, class_names, block_path, dataset):
+    """Save a 3D plot of the block colored by classes."""
+    try:
+        import matplotlib
+        matplotlib.use('Agg')  # Non-GUI backend for clusters
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+    except ImportError:
+        print("WARNING: matplotlib not available, skipping plot generation")
+        return False
+    
+    # Create libs directory if it doesn't exist
+    libs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'libs')
+    os.makedirs(libs_dir, exist_ok=True)
+    
+    # Create figure
+    fig = plt.figure(figsize=(12, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # Plot points colored by class labels
+    scatter = ax.scatter(xyz[:, 0], xyz[:, 1], xyz[:, 2], 
+                        c=labels, cmap='tab20', s=1, alpha=0.8)
+    
+    # Customize plot
+    ax.set_xlabel('X (m)')
+    ax.set_ylabel('Y (m)')
+    ax.set_zlabel('Z (m)')
+    ax.set_title(f'Block: {os.path.basename(block_path)} - Colored by Classes\nDataset: {dataset.upper()}')
+    
+    # Add colorbar with class names
+    cbar = plt.colorbar(scatter, ax=ax, shrink=0.6, aspect=30)
+    cbar.set_label('Class Label')
+    
+    # Add legend for class names
+    unique_labels = np.unique(labels)
+    legend_text = []
+    for label in unique_labels:
+        label_int = int(label)
+        if label_int < len(class_names) and label_int >= 0:
+            class_name = class_names[label_int]
+        elif label_int == 255:
+            class_name = "ignore"
+        else:
+            class_name = f"unknown_{label_int}"
+        legend_text.append(f"{label_int}: {class_name}")
+    
+    # Add legend as text box
+    legend_str = '\n'.join(legend_text[:10])  # Limit to first 10 classes
+    if len(unique_labels) > 10:
+        legend_str += f"\n... and {len(unique_labels)-10} more"
+    
+    ax.text2D(0.02, 0.98, legend_str, transform=ax.transAxes, 
+              verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+              fontsize=8, family='monospace')
+    
+    # Generate output filename
+    block_name = os.path.splitext(os.path.basename(block_path))[0]
+    output_filename = f"{block_name}_classes.png"
+    output_path = os.path.join(libs_dir, output_filename)
+    
+    # Save plot
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print(f"Class visualization saved to: {output_path}")
+    return True
+
+
+def analyze_block(block_path, dataset='s3dis', save_plot=True):
     """Analyze a block file and show statistics."""
     
     # Check if file exists
@@ -159,6 +228,13 @@ def analyze_block(block_path, dataset='s3dis'):
     
     print("=" * 70)
     
+    # Generate plot if requested
+    if save_plot:
+        print("\nGenerating class visualization...")
+        success = save_class_plot(xyz, labels, class_names, block_path, dataset)
+        if not success:
+            print("Plot generation failed.")
+    
     return xyz, rgb, labels
 
 
@@ -171,6 +247,7 @@ Examples:
   python analyze_block.py Area_1_office_1_block_0.npy
   python analyze_block.py scene0000_00_block_5.npy --dataset scannet
   python analyze_block.py my_block.npy --dataset s3dis
+  python analyze_block.py my_block.npy --no-plot
         """
     )
     
@@ -182,10 +259,15 @@ Examples:
                        default='s3dis',
                        help='Dataset type (default: s3dis)')
     
+    parser.add_argument('--no-plot',
+                       action='store_true',
+                       help='Skip plot generation (text analysis only)')
+    
     args = parser.parse_args()
     
     # Analyze the block
-    result = analyze_block(args.block_path, args.dataset)
+    save_plot = not args.no_plot
+    result = analyze_block(args.block_path, args.dataset, save_plot)
     
     if result is None:
         sys.exit(1)
