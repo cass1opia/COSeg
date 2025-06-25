@@ -25,6 +25,7 @@ from functools import partial
 from util import config
 from util.s3dis_fs import S3DIS_FS, S3DIS_FS_TEST, S3DIS_FSForVIS
 from util.scannet_v2_fs import Scannetv2_FS, Scannetv2_FS_TEST
+from pcnn.multi_point_cloud_loader import get_dataloaders_fs, MultiPointCloudLoaderFS
 from util.common_util import (
     AverageMeter,
     find_free_port,
@@ -307,6 +308,30 @@ def main_worker(gpu, ngpus_per_node, argss):
             "The dataset {} is not supported.".format(args.data_name)
         )
 
+    # Alternative: Use MultiPointCloudLoaderFS if specified
+    if args.data_name == "essen_outdoor":
+        # Get class IDs from config
+        class_ids = getattr(args, 'class_ids', list(range(13)))  # Default to 13 classes
+        
+        # Create few-shot dataloaders using MultiPointCloudLoaderFS
+        train_loader_fs, val_loader_fs = get_dataloaders_fs(
+            data_dir=args.data_root,  # Single directory containing all files
+            cache_dir=getattr(args, 'cache_dir', './cache'),
+            class_ids=class_ids,
+            cvfold=getattr(args, 'cvfold', 0),  # Cross-validation fold
+            k=getattr(args, 'k_neighbors', 32),
+            neighborhood_type=getattr(args, 'neighborhood_type', 'ball'),
+            neighborhood_sampling=getattr(args, 'neighborhood_sampling', 'random_sampling'),
+            radius=getattr(args, 'radius', 0.1),
+            n_way=args.n_way,
+            k_shot=args.k_shot,
+            n_queries=args.n_queries,
+            num_episode=args.num_episode,
+            voxel_size=args.voxel_size,
+            voxel_max=args.voxel_max,
+            seed=getattr(args, 'manual_seed', None)
+        )
+
     if not args.forvis:
         # main process firstly call, since it will construct the dataset if not exist
         # and avoid conflicts from other processes
@@ -320,21 +345,25 @@ def main_worker(gpu, ngpus_per_node, argss):
             dist.barrier()
             val_data.prepare_test_data()
 
-    if args.distributed:
-        val_sampler = torch.utils.data.distributed.DistributedSampler(val_data)
+    # Use MultiPointCloudLoaderFS if specified, otherwise use regular DataLoader
+    if args.data_name == "essen_outdoor":
+        val_loader = val_loader_fs
     else:
-        val_sampler = None
-    val_loader = torch.utils.data.DataLoader(
-        val_data,
-        batch_size=1,
-        shuffle=False,
-        num_workers=args.workers,
-        pin_memory=True,
-        sampler=val_sampler,
-        collate_fn=partial(
-            collate_fn_limit_fs, include_scene_names=args.forvis
-        ),
-    )
+        if args.distributed:
+            val_sampler = torch.utils.data.distributed.DistributedSampler(val_data)
+        else:
+            val_sampler = None
+        val_loader = torch.utils.data.DataLoader(
+            val_data,
+            batch_size=1,
+            shuffle=False,
+            num_workers=args.workers,
+            pin_memory=True,
+            sampler=val_sampler,
+            collate_fn=partial(
+                collate_fn_limit_fs, include_scene_names=args.forvis
+            ),
+        )
 
     if args.test:
         validate(val_loader, model, valid_calsses)
@@ -430,21 +459,25 @@ def main_worker(gpu, ngpus_per_node, argss):
     if main_process():
         logger.info("Train Classes: {}".format(train_calsses))
         logger.info("train_data samples: '{}'".format(len(train_data)))
-    if args.distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(
-            train_data
-        )
+    # Use MultiPointCloudLoaderFS if specified, otherwise use regular DataLoader
+    if args.data_name == "essen_outdoor":
+        train_loader = train_loader_fs
     else:
-        train_sampler = None
-    train_loader = torch.utils.data.DataLoader(
-        train_data,
-        batch_size=1,
-        shuffle=(train_sampler is None),
-        num_workers=args.workers,
-        pin_memory=True,
-        sampler=train_sampler,
-        collate_fn=collate_fn_limit_fs_train,
-    )
+        if args.distributed:
+            train_sampler = torch.utils.data.distributed.DistributedSampler(
+                train_data
+            )
+        else:
+            train_sampler = None
+        train_loader = torch.utils.data.DataLoader(
+            train_data,
+            batch_size=1,
+            shuffle=(train_sampler is None),
+            num_workers=args.workers,
+            pin_memory=True,
+            sampler=train_sampler,
+            collate_fn=collate_fn_limit_fs_train,
+        )
 
     # set scheduler
     if args.scheduler == "MultiStepWithWarmup":
