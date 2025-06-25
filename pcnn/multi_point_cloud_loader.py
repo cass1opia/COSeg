@@ -1,5 +1,6 @@
-__all__ = ['get_dataloaders', 'MultiPointCloudLoader']
+__all__ = ['get_dataloaders', 'MultiPointCloudLoader', 'MultiPointCloudLoaderFS', 'get_dataloaders_fs']
 
+import os
 from concurrent import futures
 import math
 from pathlib import Path
@@ -448,7 +449,7 @@ def get_dataloaders(paths_train: List[Path],
                     load_files_async: bool = False,
                     loss_weight_attribute: Optional[str] = None,
                     seed: Optional[int] = None) -> Tuple[MultiPointCloudLoader, MultiPointCloudLoader,
-                                                         Optional[MultiPointCloudLoader]]:
+Optional[MultiPointCloudLoader]]:
     """Creation method for both the training and testing versions of the :code:`MultiPointCloudLoader`.
 
     :param paths_train: list of training filenames as strings, e.g. ["data/train_file1.h5", "data/train_file2.h5"]
@@ -642,3 +643,427 @@ def get_dataloaders(paths_train: List[Path],
         seed=seed
     )
     return train_loader, test_loader, calibration_train_loader
+
+
+class MultiPointCloudLoaderFS:
+    """Few-shot learning version of MultiPointCloudLoader that supports episodic training.
+    
+    Creates episodes where each episode contains support and query sets for few-shot learning.
+    Uses PointCloudDataset for proper neighborhood sampling and data handling.
+    """
+
+    def __init__(self,
+                 data_dir: str,
+                 cache_dir: str,
+                 class_ids: List[int],
+                 target_classes: List[int],
+                 save_trees: bool,
+                 k: int,
+                 neighborhood_type: NeighborhoodType,
+                 neighborhood_sampling: NeighborhoodSampling,
+                 radius: float,
+                 n_way: int,
+                 k_shot: int,
+                 n_queries: int,
+                 num_episode: int,
+                 voxel_size: float = 0.04,
+                 voxel_max: Optional[int] = None,
+                 sampling_grid_size: Optional[float] = None,
+                 sampling_feature: Optional[str] = None,
+                 stratified_sampling_strategy: Optional[str] = None,
+                 k_percentages: Optional[List[float]] = None,
+                 known_columns: Optional[List[str]] = None,
+                 loss_weight_attribute: Optional[str] = None,
+                 transform: bool = True,
+                 seed: Optional[int] = None) -> None:
+
+        # Discover all point cloud files in the given directory
+        import glob
+        supported_extensions = ['*.h5', '*.las', '*.laz', '*.ply', '*.pcd', '*.txt']
+        self.files = []
+        for ext in supported_extensions:
+            pattern = os.path.join(data_dir, '**', ext)
+            self.files.extend([Path(f) for f in glob.glob(pattern, recursive=True)])
+
+        if not self.files:
+            raise ValueError(f"No point cloud files found in directory: {data_dir}")
+
+        self.data_dir = data_dir
+        self.cache_dir = cache_dir
+        self.class_ids = class_ids
+        self.target_classes = target_classes
+        self.save_trees = save_trees
+        self.k = k
+        self.neighborhood_type = neighborhood_type
+        self.neighborhood_sampling = neighborhood_sampling
+        self.radius = radius
+        self.n_way = n_way
+        self.k_shot = k_shot
+        self.n_queries = n_queries
+        self.num_episode = num_episode
+        self.voxel_size = voxel_size
+        self.voxel_max = voxel_max
+        self.sampling_grid_size = sampling_grid_size
+        self.sampling_feature = sampling_feature
+        self.stratified_sampling_strategy = stratified_sampling_strategy
+        self.k_percentages = k_percentages
+        self.known_columns = known_columns
+        self.loss_weight_attribute = loss_weight_attribute
+        self.transform = transform
+        self.seed = seed
+
+        self.reader = FileReaderManager()
+        self.episode_counter = 0
+
+        # Build class to files mapping
+        self.class2files = self._build_class2files_mapping()
+
+        # Generate episodes
+        self.episodes = self._generate_episodes()
+
+        # Cache for loaded datasets
+        self.dataset_cache = {}
+
+    def _build_class2files_mapping(self) -> dict:
+        """Build mapping from class ID to files that contain this class."""
+        class2files = {class_id: [] for class_id in self.target_classes}
+
+        for file_idx, file in enumerate(self.files):
+            point_cloud = self.reader.read(file).data()
+            unique_classes = np.unique(point_cloud['semclassid'])
+
+            for class_id in self.target_classes:
+                if class_id in unique_classes:
+                    class2files[class_id].append(file_idx)
+
+        return class2files
+
+    def _generate_episodes(self) -> List[dict]:
+        """Generate few-shot learning episodes."""
+        episodes = []
+        rng = np.random.default_rng(self.seed)
+
+        for _ in range(self.num_episode):
+            sampled_classes = rng.choice(self.target_classes, size=self.n_way, replace=False)
+
+            episode = {
+                'classes': sampled_classes.tolist(),
+                'support_files': [],
+                'query_files': []
+            }
+
+            for class_id in sampled_classes:
+                available_files = self.class2files[class_id].copy()
+
+                if len(available_files) == 0:
+                    continue
+
+                total_needed = self.k_shot + self.n_queries
+                if len(available_files) >= total_needed:
+                    selected_files = rng.choice(available_files, size=total_needed, replace=False)
+                else:
+                    selected_files = rng.choice(available_files, size=total_needed, replace=True)
+
+                episode['support_files'].extend([(file_idx, class_id) for file_idx in selected_files[:self.k_shot]])
+                episode['query_files'].extend([(file_idx, class_id) for file_idx in selected_files[self.k_shot:]])
+
+            episodes.append(episode)
+
+        return episodes
+
+    def _get_dataset(self, file_idx: int) -> PointCloudDataset:
+        """Get or create PointCloudDataset for given file."""
+        if file_idx not in self.dataset_cache:
+            self.dataset_cache[file_idx] = PointCloudDataset(
+                self.files[file_idx],
+                self.save_trees,
+                self.k,
+                self.neighborhood_type,
+                self.neighborhood_sampling,
+                self.radius,
+                sampling_grid_size=self.sampling_grid_size,
+                sampling_feature=self.sampling_feature,
+                stratified_sampling_strategy=self.stratified_sampling_strategy,
+                k_percentages=self.k_percentages,
+                cache_dir=self.cache_dir,
+                known_columns=self.known_columns,
+                loss_weight_attribute=self.loss_weight_attribute,
+                transform=self.transform
+            )
+        return self.dataset_cache[file_idx]
+
+    def _sample_neighborhoods_for_class(self, file_idx: int, target_class: int,
+                                        num_samples: int) -> List[torch.Tensor]:
+        """Sample neighborhoods from a file for a specific class."""
+        dataset = self._get_dataset(file_idx)
+
+        # Find indices of points belonging to target class
+        point_cloud = dataset.point_cloud
+        class_mask = point_cloud['semclassid'] == target_class
+        class_indices = np.where(class_mask)[0]
+
+        if len(class_indices) == 0:
+            return []
+
+        # Sample indices for neighborhoods
+        if len(class_indices) >= num_samples:
+            selected_indices = np.random.choice(class_indices, size=num_samples, replace=False)
+        else:
+            selected_indices = np.random.choice(class_indices, size=num_samples, replace=True)
+
+        neighborhoods = []
+        for idx in selected_indices:
+            neighborhood = dataset[idx]
+            neighborhoods.append(neighborhood)
+
+        return neighborhoods
+
+    def __next__(self) -> tuple:
+        """Return next few-shot episode in the expected format."""
+        episode = self.episodes[self.episode_counter % len(self.episodes)]
+        sampled_classes = np.array(episode['classes'])
+
+        support_ptclouds = []
+        support_base_masks = []
+        support_test_masks = []
+        query_ptclouds = []
+        query_base_labels = []
+        query_test_labels = []
+
+        # Process support samples
+        for file_idx, target_class in episode['support_files']:
+            neighborhoods = self._sample_neighborhoods_for_class(file_idx, target_class, 1)
+
+            if neighborhoods:
+                neighborhood = neighborhoods[0]
+
+                # Extract coordinates and features
+                if isinstance(neighborhood, dict):
+                    coords = neighborhood.get('coords', neighborhood.get('points'))
+                    features = neighborhood.get('features', neighborhood.get('colors'))
+                    labels = neighborhood.get('labels', neighborhood.get('semclassid'))
+                else:
+                    # If it's a tensor, assume it contains [coords, features]
+                    coords = neighborhood[:, :3]
+                    features = neighborhood[:, 3:6] if neighborhood.shape[1] > 3 else coords
+                    labels = neighborhood[:, -1] if neighborhood.shape[1] > 6 else torch.zeros(len(coords))
+
+                # Combine coordinates and features
+                ptcloud = torch.cat([coords, features], dim=-1)
+
+                # Create masks for support
+                base_mask = torch.zeros_like(labels, dtype=torch.long)
+                test_mask = (labels == target_class).int()
+
+                support_ptclouds.append(ptcloud)
+                support_base_masks.append(base_mask)
+                support_test_masks.append(test_mask)
+
+        # Process query samples
+        for file_idx, target_class in episode['query_files']:
+            neighborhoods = self._sample_neighborhoods_for_class(file_idx, target_class, 1)
+
+            if neighborhoods:
+                neighborhood = neighborhoods[0]
+
+                # Extract data same as support
+                if isinstance(neighborhood, dict):
+                    coords = neighborhood.get('coords', neighborhood.get('points'))
+                    features = neighborhood.get('features', neighborhood.get('colors'))
+                    labels = neighborhood.get('labels', neighborhood.get('semclassid'))
+                else:
+                    coords = neighborhood[:, :3]
+                    features = neighborhood[:, 3:6] if neighborhood.shape[1] > 3 else coords
+                    labels = neighborhood[:, -1] if neighborhood.shape[1] > 6 else torch.zeros(len(coords))
+
+                ptcloud = torch.cat([coords, features], dim=-1)
+
+                # Create labels for query
+                base_label = labels.clone()
+
+                # Create test labels: map episode classes to 1, 2, ..., n_way
+                test_label = torch.zeros_like(labels)
+                class_dict = {c: i + 1 for i, c in enumerate(sampled_classes)}
+                for i, lb in enumerate(labels):
+                    if lb.item() in class_dict:
+                        test_label[i] = class_dict[lb.item()]
+                    else:
+                        test_label[i] = 0
+
+                query_ptclouds.append(ptcloud)
+                query_base_labels.append(base_label)
+                query_test_labels.append(test_label)
+
+        self.episode_counter += 1
+
+        return (
+            support_ptclouds,
+            support_base_masks,
+            support_test_masks,
+            query_ptclouds,
+            query_base_labels,
+            query_test_labels,
+            sampled_classes,
+        )
+
+    def __len__(self) -> int:
+        return self.num_episode
+
+    def __iter__(self):
+        self.episode_counter = 0
+        return self
+
+
+def get_dataloaders_fs(data_dir: str,
+                       cache_dir: str,
+                       class_ids: List[int],
+                       k: int,
+                       neighborhood_type: NeighborhoodType,
+                       neighborhood_sampling: NeighborhoodSampling,
+                       radius: float,
+                       n_way: int,
+                       k_shot: int,
+                       n_queries: int,
+                       num_episode: int,
+                       cvfold: int = 0,
+                       voxel_size: float = 0.04,
+                       voxel_max: Optional[int] = None,
+                       sampling_grid_size: Optional[float] = None,
+                       sampling_feature: Optional[str] = None,
+                       stratified_sampling_strategy: Optional[str] = None,
+                       k_percentages: Optional[List[float]] = None,
+                       known_columns: Optional[List[str]] = None,
+                       loss_weight_attribute: Optional[str] = None,
+                       seed: Optional[int] = None) -> Tuple[MultiPointCloudLoaderFS, MultiPointCloudLoaderFS]:
+    """Creation method for few-shot learning versions of MultiPointCloudLoader.
+    
+    Uses the same class-based cross-validation as S3DIS_FS.
+    """
+
+    # Load class names and create mappings like S3DIS_FS
+    datasets_root = os.path.join(os.path.dirname(os.path.dirname(__file__)), "datasets")
+    
+    # Try to load Essen Outdoor class names
+    essen_classnames_path = os.path.join(datasets_root, "EssenOutdoor", "meta", "essen_classnames.txt")
+    
+    if os.path.exists(essen_classnames_path):
+        # Load Essen Outdoor class names
+        with open(essen_classnames_path, 'r') as f:
+            class_names = f.readlines()
+        
+        class2type = {i: name.strip() for i, name in enumerate(class_names) if name.strip()}
+        type2class = {class2type[t]: t for t in class2type}
+        class_count = len(class2type)
+        
+        # Define Essen Outdoor folds based on class names (similar to S3DIS)
+        fold_0 = [
+            "TrafficSign",
+            "StreetSign", 
+            "CircularTrafficSign",
+            "OctagonalTrafficSign",
+            "RectangularTrafficSign",
+            "TriangularTrafficSign",
+        ]
+        fold_1 = [
+            "DirectionSign",
+            "FlippedTriangularTrafficSign", 
+            "PriorityRoad",
+            "OneWayStreet",
+            "Zone",
+            "Exit",
+            "DistanceMarker"
+        ]
+        
+        # cvfold parameter handling exactly like S3DIS_FS
+        if cvfold == 0:
+            test_classes = [type2class[i] for i in fold_0 if i in type2class]
+        elif cvfold == 1:
+            test_classes = [type2class[i] for i in fold_1 if i in type2class]
+        else:
+            raise NotImplementedError(
+                "Unknown cvfold (%s). [Options: 0,1]" % cvfold
+            )
+        
+        # Train classes calculation exactly like S3DIS_FS
+        all_classes = [i for i in range(0, class_count)]
+        train_classes = [c for c in all_classes if c not in test_classes]
+        
+        print(f"Essen Outdoor class2type: {class2type}")
+        print(f"Fold {cvfold}: train_classes={train_classes}, test_classes={test_classes}")
+        
+    else:
+        # Fallback to generic class splits if no class names file found
+        print(f"Warning: {essen_classnames_path} not found, using generic class splits")
+        total_classes = len(class_ids)
+        mid_point = total_classes // 2
+        
+        fold_0_classes = class_ids[:mid_point]  
+        fold_1_classes = class_ids[mid_point:]
+        
+        # cvfold parameter handling
+        if cvfold == 0:
+            test_classes = fold_0_classes
+        elif cvfold == 1:
+            test_classes = fold_1_classes
+        else:
+            raise NotImplementedError(
+                "Unknown cvfold (%s). [Options: 0,1]" % cvfold
+            )
+        
+        # Train classes calculation
+        all_classes = [i for i in class_ids]
+        train_classes = [c for c in all_classes if c not in test_classes]
+
+    train_loader = MultiPointCloudLoaderFS(
+        data_dir=data_dir,
+        cache_dir=cache_dir,
+        class_ids=class_ids,
+        target_classes=train_classes,
+        save_trees=True,
+        k=k,
+        neighborhood_type=neighborhood_type,
+        neighborhood_sampling=neighborhood_sampling,
+        radius=radius,
+        n_way=n_way,
+        k_shot=k_shot,
+        n_queries=n_queries,
+        num_episode=num_episode,
+        voxel_size=voxel_size,
+        voxel_max=voxel_max,
+        sampling_grid_size=sampling_grid_size,
+        sampling_feature=sampling_feature,
+        stratified_sampling_strategy=stratified_sampling_strategy,
+        k_percentages=k_percentages,
+        known_columns=known_columns,
+        loss_weight_attribute=loss_weight_attribute,
+        transform=True,
+        seed=seed
+    )
+
+    test_loader = MultiPointCloudLoaderFS(
+        data_dir=data_dir,
+        cache_dir=cache_dir,
+        class_ids=class_ids,
+        target_classes=test_classes,
+        save_trees=True,
+        k=k,
+        neighborhood_type=neighborhood_type,
+        neighborhood_sampling=neighborhood_sampling,
+        radius=radius,
+        n_way=n_way,
+        k_shot=k_shot,
+        n_queries=n_queries,
+        num_episode=num_episode,
+        voxel_size=voxel_size,
+        voxel_max=voxel_max,
+        sampling_grid_size=sampling_grid_size,
+        sampling_feature=sampling_feature,
+        stratified_sampling_strategy=stratified_sampling_strategy,
+        k_percentages=k_percentages,
+        known_columns=known_columns,
+        loss_weight_attribute=loss_weight_attribute,
+        transform=False,
+        seed=seed
+    )
+
+    return train_loader, test_loader
