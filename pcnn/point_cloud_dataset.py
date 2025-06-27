@@ -15,15 +15,15 @@ from torch.multiprocessing import Lock
 from torch.utils.data import Dataset, DataLoader, IterableDataset
 from torch.utils.data.dataloader import default_collate
 
-from .data_utils import jitter, random_scale, random_rotate, shift, translate_scale_xy, translate_scale_xyz
-from . import general_utils as utils
-from .file_handler import FileReaderManager
-from .sampling_utils import repeat_if_necessary, farthest_point_sampling_cluster, \
+from pcnn.data_utils import jitter, random_scale, random_rotate, shift, translate_scale_xy, translate_scale_xyz
+from pcnn import general_utils as utils
+from pcnn.file_handler import FileReaderManager
+from pcnn.sampling_utils import repeat_if_necessary, farthest_point_sampling_cluster, \
     stratified_sampling, NeighborhoodSampling, feature_based_sampling, uniform_sampling
 
-from .random_sampler import RandomSampler
-from .grid_sampler import GridSampler
-from .abstract_sampler import AbstractSampler
+from pcnn.random_sampler import RandomSampler
+from pcnn.grid_sampler import GridSampler
+from pcnn.abstract_sampler import AbstractSampler
 
 NeighborhoodType = Literal['ball', 'circle', 'cube', 'square']
 Interpolation = Literal['full', 'weighted', 'none']
