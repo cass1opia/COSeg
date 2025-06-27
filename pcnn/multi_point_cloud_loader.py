@@ -821,6 +821,7 @@ class MultiPointCloudLoaderFS:
     def _sample_neighborhoods_for_class(self, file_idx: int, target_class: int,
                                         num_samples: int) -> List[torch.Tensor]:
         """Sample neighborhoods from a file for a specific class."""
+        print(f"Sampling neighborhoods for class {target_class} from file index {file_idx}...")
         dataset = self._get_dataset(file_idx)
 
         # Find indices of points belonging to target class
