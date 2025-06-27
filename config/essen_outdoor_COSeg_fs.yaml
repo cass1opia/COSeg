@@ -1,6 +1,6 @@
 DATA:
   data_name: essen_outdoor
-  data_root: /path/to/essen_outdoor/pointcloud_data
+  data_root: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/street-signs
   classes: 13
   class_ids: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
   fea_dim: 6
@@ -63,7 +63,7 @@ TRAIN:
   print_freq: 1
   save_freq: 1
   save_path: ./saved_models # Fill the path to store the trained model
-  weight:  /path/to/essen_outdoor/pretrained_weights/model/model_best.pth
+  weight:  #path to weight
   resume:  # path to latest checkpoint (default: none)
   evaluate: True  # evaluate on validation set, extra gpu memory needed and small batch_size_val is recommend
   eval_freq: 1
