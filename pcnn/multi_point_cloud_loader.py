@@ -734,11 +734,13 @@ class MultiPointCloudLoaderFS:
             with open(cache_file, "rb") as f:
                 class2files = pickle.load(f)
         else:
+            print("Building class to files mapping...")
             min_ratio = 0.05
             min_pts = 100
             class2files = {class_id: [] for class_id in self.target_classes}
             
             for file_idx, file in enumerate(self.files):
+                print(f"Processing file {file_idx + 1}/{len(self.files)}: {file}")
                 point_cloud = self.reader.read(file).data()
                 labels = point_cloud['semclassid']
                 unique_classes = np.unique(labels)
@@ -754,6 +756,7 @@ class MultiPointCloudLoaderFS:
             
             os.makedirs(self.cache_dir, exist_ok=True)
             with open(cache_file, "wb") as f:
+                print("Saving class to files mapping to cache in ", cache_file)
                 pickle.dump(class2files, f, pickle.HIGHEST_PROTOCOL)
         
         return class2files
