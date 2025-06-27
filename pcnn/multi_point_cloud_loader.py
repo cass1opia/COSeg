@@ -863,7 +863,7 @@ class MultiPointCloudLoaderFS:
             if neighborhoods:
                 neighborhood = neighborhoods[0]
                 print("neighborhood type:", type(neighborhood))
-                print("neighborhood header:", neighborhood[:5])
+                print("neighborhood:", neighborhood)
                 # Extract coordinates and features
                 if isinstance(neighborhood, dict):
                     coords = neighborhood.get('coords', neighborhood.get('points'))
