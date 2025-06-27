@@ -80,7 +80,7 @@ Few-shot:
   vis: 0
   forvis: 0
   vis_save_path:
-  target_class: building
+  target_class: 1
 
 Distributed:
   dist_url: tcp://127.0.0.1:6789
