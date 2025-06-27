@@ -3,19 +3,22 @@
 Test script for MultiPointCloudLoaderFS on compute cluster.
 Saves neighborhoods for k epochs (5) to test_vis folder.
 """
+# Add project root to path (go up one level from scripts/ to project root)
 
 import os
 import sys
 import argparse
 import numpy as np
+
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+
 from util import config
 from pcnn.multi_point_cloud_loader import get_dataloaders_fs
 import torch
 from pathlib import Path
 
-# Add project root to path (go up one level from scripts/ to project root)
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, project_root)
+
 
 
 
