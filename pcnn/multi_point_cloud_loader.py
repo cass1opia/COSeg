@@ -726,18 +726,18 @@ class MultiPointCloudLoaderFS:
 
     def _build_class2files_mapping(self) -> dict:
         """Build mapping from class ID to files that contain this class."""
-
         
         cache_file = os.path.join(self.cache_dir, "class2files.pkl")
         
         if os.path.exists(cache_file):
             with open(cache_file, "rb") as f:
-                class2files = pickle.load(f)
+                all_class2files = pickle.load(f)
         else:
             print("Building class to files mapping...")
             min_ratio = 0.05
             min_pts = 100
-            class2files = {class_id: [] for class_id in self.target_classes}
+            # Use ALL class_ids instead of just target_classes
+            all_class2files = {class_id: [] for class_id in self.class_ids}
             
             for file_idx, file in enumerate(self.files):
                 print(f"Processing file {file_idx + 1}/{len(self.files)}: {file.name}")
@@ -746,19 +746,21 @@ class MultiPointCloudLoaderFS:
                 unique_classes = np.unique(labels)
                 
                 for class_id in unique_classes:
-                    if class_id in self.target_classes:
+                    if class_id in self.class_ids:  # Check against all class_ids
                         num_points = np.count_nonzero(labels == class_id)
                         total_points = len(labels)
                         threshold = max(int(total_points * min_ratio), min_pts)
                         
                         if num_points > threshold:
-                            class2files[class_id].append(file_idx)
+                            all_class2files[class_id].append(file_idx)
             
             os.makedirs(self.cache_dir, exist_ok=True)
             with open(cache_file, "wb") as f:
                 print("Saving class to files mapping to cache in ", cache_file)
-                pickle.dump(class2files, f, pickle.HIGHEST_PROTOCOL)
+                pickle.dump(all_class2files, f, pickle.HIGHEST_PROTOCOL)
         
+        # Return only target_classes subset
+        class2files = {class_id: all_class2files[class_id] for class_id in self.target_classes if class_id in all_class2files}
         return class2files
 
     def _generate_episodes(self) -> List[dict]:
@@ -843,7 +845,6 @@ class MultiPointCloudLoaderFS:
         return neighborhoods
 
     def __next__(self) -> tuple:
-        """Return next few-shot episode in the expected format."""
         episode = self.episodes[self.episode_counter % len(self.episodes)]
         sampled_classes = np.array(episode['classes'])
 
