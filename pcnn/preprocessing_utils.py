@@ -15,11 +15,11 @@ import numpy as np
 import pandas as pd
 import torch
 
-import globals
+from pcnn import globals
 
-from .point_cloud import PointCloud
-from .file_handler import FileReaderManager, FileWriterManager
-from .general_utils import pair_function
+from pcnn.point_cloud import PointCloud
+from pcnn.file_handler import FileReaderManager, FileWriterManager
+from pcnn.general_utils import pair_function
 
 
 def _get_unique_pair(baseclassid: int,
