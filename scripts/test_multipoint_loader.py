@@ -29,30 +29,23 @@ def save_episode_data(episode_data, epoch, episode_idx, save_dir):
     (support_ptclouds, support_base_masks, support_test_masks,
      query_ptclouds, query_base_labels, query_test_labels, sampled_classes) = episode_data
 
-    # Create episode directory
-    episode_dir = os.path.join(save_dir, f"epoch_{epoch}", f"episode_{episode_idx}")
-    os.makedirs(episode_dir, exist_ok=True)
+    # Create save directory if it doesn't exist
+    os.makedirs(save_dir, exist_ok=True)
 
     # Save sampled classes
-    np.save(os.path.join(episode_dir, "sampled_classes.npy"), sampled_classes)
+    np.save(os.path.join(save_dir, f"epoch_{epoch}_episode_{episode_idx}_sampled_classes.npy"), sampled_classes)
 
     # Save support data
-    support_dir = os.path.join(episode_dir, "support")
-    os.makedirs(support_dir, exist_ok=True)
-
     for i, (ptcloud, base_mask, test_mask) in enumerate(zip(support_ptclouds, support_base_masks, support_test_masks)):
-        np.save(os.path.join(support_dir, f"ptcloud_{i}.npy"), ptcloud.cpu().numpy())
-        np.save(os.path.join(support_dir, f"base_mask_{i}.npy"), base_mask.cpu().numpy())
-        np.save(os.path.join(support_dir, f"test_mask_{i}.npy"), test_mask.cpu().numpy())
+        np.save(os.path.join(save_dir, f"epoch_{epoch}_episode_{episode_idx}_support_{i}_ptcloud.npy"), ptcloud.cpu().numpy())
+        np.save(os.path.join(save_dir, f"epoch_{epoch}_episode_{episode_idx}_support_{i}_base_mask.npy"), base_mask.cpu().numpy())
+        np.save(os.path.join(save_dir, f"epoch_{epoch}_episode_{episode_idx}_support_{i}_test_mask.npy"), test_mask.cpu().numpy())
 
     # Save query data
-    query_dir = os.path.join(episode_dir, "query")
-    os.makedirs(query_dir, exist_ok=True)
-
     for i, (ptcloud, base_label, test_label) in enumerate(zip(query_ptclouds, query_base_labels, query_test_labels)):
-        np.save(os.path.join(query_dir, f"ptcloud_{i}.npy"), ptcloud.cpu().numpy())
-        np.save(os.path.join(query_dir, f"base_label_{i}.npy"), base_label.cpu().numpy())
-        np.save(os.path.join(query_dir, f"test_label_{i}.npy"), test_label.cpu().numpy())
+        np.save(os.path.join(save_dir, f"epoch_{epoch}_episode_{episode_idx}_query_{i}_ptcloud.npy"), ptcloud.cpu().numpy())
+        np.save(os.path.join(save_dir, f"epoch_{epoch}_episode_{episode_idx}_query_{i}_base_label.npy"), base_label.cpu().numpy())
+        np.save(os.path.join(save_dir, f"epoch_{epoch}_episode_{episode_idx}_query_{i}_test_label.npy"), test_label.cpu().numpy())
 
     print(f"Saved episode {episode_idx} for epoch {epoch}")
     print(f"  - Sampled classes: {sampled_classes}")
