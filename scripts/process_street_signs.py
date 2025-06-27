@@ -3,12 +3,12 @@
 Script to process point cloud files for street sign labeling.
 
 This script processes point cloud files in CSV/TXT format and performs the following operations:
-1. For points where SemClassID == 15 (StreetSign): Map SpecificClassID to SemClassID
-2. Replace SemClassID with SpecificClassID for all points
+1. Save original SemClassID values in SpecificClassID column
+2. For points where original SemClassID == 15 (StreetSign): Map original SpecificClassID to SemClassID
 3. Save processed files with suffix "_street_sign_labeling.txt"
 
 Input format: X,Y,Z,R,G,B,SemClassID,SpecificClassID,Intensity
-Output format: Same structure but with modified SemClassID column
+Output format: Same structure but with swapped SemClassID/SpecificClassID columns
 
 Usage:
     python scripts/process_street_signs.py --input_dir /path/to/input --output_dir /path/to/output
@@ -49,15 +49,14 @@ def process_point_cloud_file(input_file, output_file):
         # Create a copy for processing
         processed_df = df.copy()
         
-        # Step 1: For points where SemClassID == 15 (StreetSign), 
-        # map SpecificClassID to SemClassID
+        # Step 1: Save original SemClassID in SpecificClassID column
+        processed_df['SpecificClassID'] = df['SemClassID']
+        
+        # Step 2: For points where original SemClassID == 15 (StreetSign), 
+        # map original SpecificClassID to SemClassID
         street_sign_mask = df['SemClassID'] == 15
         if street_sign_mask.any():
             processed_df.loc[street_sign_mask, 'SemClassID'] = df.loc[street_sign_mask, 'SpecificClassID']
-        
-        # Step 2: Replace SemClassID with SpecificClassID for all points
-        # (This overwrites the changes from step 1, but we keep it as requested)
-        processed_df['SemClassID'] = df['SpecificClassID']
         
         # Save the processed file
         processed_df.to_csv(output_file, header=False, index=False, float_format='%.6f')
