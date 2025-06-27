@@ -6,7 +6,7 @@ import math
 from pathlib import Path
 import sys
 from typing import Any, Callable, List, Literal, Optional, Tuple
-
+import pickle
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Sampler, RandomSampler, WeightedRandomSampler
@@ -726,17 +726,36 @@ class MultiPointCloudLoaderFS:
 
     def _build_class2files_mapping(self) -> dict:
         """Build mapping from class ID to files that contain this class."""
-        class2files = {class_id: [] for class_id in self.target_classes}
-        print("Building class to files mapping...")
-        for file_idx, file in enumerate(self.files):
-            print(f"Processing file {file_idx + 1}/{len(self.files)}: {file.name}")
-            point_cloud = self.reader.read(file).data()
-            unique_classes = np.unique(point_cloud['semclassid'])
 
-            for class_id in self.target_classes:
-                if class_id in unique_classes:
-                    class2files[class_id].append(file_idx)
-
+        
+        cache_file = os.path.join(self.cache_dir, "class2files.pkl")
+        
+        if os.path.exists(cache_file):
+            with open(cache_file, "rb") as f:
+                class2files = pickle.load(f)
+        else:
+            min_ratio = 0.05
+            min_pts = 100
+            class2files = {class_id: [] for class_id in self.target_classes}
+            
+            for file_idx, file in enumerate(self.files):
+                point_cloud = self.reader.read(file).data()
+                labels = point_cloud['semclassid']
+                unique_classes = np.unique(labels)
+                
+                for class_id in unique_classes:
+                    if class_id in self.target_classes:
+                        num_points = np.count_nonzero(labels == class_id)
+                        total_points = len(labels)
+                        threshold = max(int(total_points * min_ratio), min_pts)
+                        
+                        if num_points > threshold:
+                            class2files[class_id].append(file_idx)
+            
+            os.makedirs(self.cache_dir, exist_ok=True)
+            with open(cache_file, "wb") as f:
+                pickle.dump(class2files, f, pickle.HIGHEST_PROTOCOL)
+        
         return class2files
 
     def _generate_episodes(self) -> List[dict]:
