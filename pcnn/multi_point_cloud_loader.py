@@ -740,6 +740,7 @@ class MultiPointCloudLoaderFS:
 
     def _generate_episodes(self) -> List[dict]:
         """Generate few-shot learning episodes."""
+        print("Generating few-shot episodes...")
         episodes = []
         rng = np.random.default_rng(self.seed)
 
