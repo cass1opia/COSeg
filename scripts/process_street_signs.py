@@ -1,18 +1,4 @@
 #!/usr/bin/env python3
-"""
-Script to process point cloud files for street sign labeling.
-
-This script processes point cloud files in CSV/TXT format and performs the following operations:
-1. Save original SemClassID values in SpecificClassID column
-2. For points where original SemClassID == 15 (StreetSign): Map original SpecificClassID to SemClassID
-3. Save processed files with suffix "_street_sign_labeling.txt"
-
-Input format: X,Y,Z,R,G,B,SemClassID,SpecificClassID,Intensity
-Output format: Same structure but with swapped SemClassID/SpecificClassID columns
-
-Usage:
-    python scripts/process_street_signs.py --input_dir /path/to/input --output_dir /path/to/output
-"""
 
 import os
 import sys
@@ -24,20 +10,9 @@ import numpy as np
 
 
 def process_point_cloud_file(input_file, output_file):
-    """
-    Process a single point cloud file.
-    
-    Args:
-        input_file (str): Path to input point cloud file
-        output_file (str): Path to output processed file
-    
-    Returns:
-        dict: Statistics about the processing
-    """
     
     try:
-        # Read the point cloud file
-        # Expected format: X,Y,Z,R,G,B,SemClassID,SpecificClassID,Intensity
+
         df = pd.read_csv(input_file, header=None, names=[
             'X', 'Y', 'Z', 'R', 'G', 'B', 'SemClassID', 'SpecificClassID', 'Intensity'
         ])
@@ -91,17 +66,6 @@ def process_point_cloud_file(input_file, output_file):
 
 
 def process_directory(input_dir, output_dir, file_extensions=None):
-    """
-    Process all point cloud files in a directory.
-    
-    Args:
-        input_dir (str): Directory containing input point cloud files
-        output_dir (str): Directory to save processed files
-        file_extensions (list): List of file extensions to process (default: ['.txt', '.csv'])
-    
-    Returns:
-        dict: Summary statistics of the processing
-    """
     
     if file_extensions is None:
         file_extensions = ['.txt', '.csv']
@@ -109,10 +73,8 @@ def process_directory(input_dir, output_dir, file_extensions=None):
     input_path = Path(input_dir)
     output_path = Path(output_dir)
     
-    # Create output directory if it doesn't exist
     output_path.mkdir(parents=True, exist_ok=True)
     
-    # Find all point cloud files
     point_cloud_files = []
     for ext in file_extensions:
         point_cloud_files.extend(input_path.glob(f'**/*{ext}'))
@@ -132,14 +94,11 @@ def process_directory(input_dir, output_dir, file_extensions=None):
         'failed_files': []
     }
     
-    # Process each file
     for input_file in tqdm(point_cloud_files, desc="Processing files"):
-        # Generate output filename
         original_name = input_file.stem
         output_filename = f"{original_name}_street_sign_labeling.txt"
         output_file = output_path / output_filename
         
-        # Process the file
         stats = process_point_cloud_file(input_file, output_file)
         
         if stats['success']:
