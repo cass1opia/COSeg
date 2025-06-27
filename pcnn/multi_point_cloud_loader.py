@@ -907,6 +907,15 @@ class MultiPointCloudLoaderFS:
                     coords = neighborhood.get('coords', neighborhood.get('points'))
                     features = neighborhood.get('features', neighborhood.get('colors'))
                     labels = neighborhood.get('labels', neighborhood.get('semclassid'))
+                    
+                    # Ensure they are tensors
+                    if not isinstance(coords, torch.Tensor):
+                        coords = torch.tensor(coords, dtype=torch.float32)
+                    if not isinstance(features, torch.Tensor):
+                        features = torch.tensor(features, dtype=torch.float32)
+                    if not isinstance(labels, torch.Tensor):
+                        labels = torch.tensor(labels, dtype=torch.long)
+                        
                 else:
                     coords = neighborhood[:, :3]
                     features = neighborhood[:, 3:6] if neighborhood.shape[1] > 3 else coords
