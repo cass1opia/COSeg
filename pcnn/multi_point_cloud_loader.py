@@ -826,7 +826,7 @@ class MultiPointCloudLoaderFS:
 
         # Find indices of points belonging to target class
         point_cloud = dataset.dataset
-        class_mask = point_cloud['semclassid'] == target_class
+        class_mask = point_cloud[6] == target_class
         class_indices = np.where(class_mask)[0]
 
         if len(class_indices) == 0:
