@@ -727,8 +727,9 @@ class MultiPointCloudLoaderFS:
     def _build_class2files_mapping(self) -> dict:
         """Build mapping from class ID to files that contain this class."""
         class2files = {class_id: [] for class_id in self.target_classes}
-
+        print("Building class to files mapping...")
         for file_idx, file in enumerate(self.files):
+            print(f"Processing file {file_idx + 1}/{len(self.files)}: {file.name}")
             point_cloud = self.reader.read(file).data()
             unique_classes = np.unique(point_cloud['semclassid'])
 
