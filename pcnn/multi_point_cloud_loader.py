@@ -740,7 +740,7 @@ class MultiPointCloudLoaderFS:
             class2files = {class_id: [] for class_id in self.target_classes}
             
             for file_idx, file in enumerate(self.files):
-                print(f"Processing file {file_idx + 1}/{len(self.files)}: {file}")
+                print(f"Processing file {file_idx + 1}/{len(self.files)}: {file.name}")
                 point_cloud = self.reader.read(file).data()
                 labels = point_cloud['semclassid']
                 unique_classes = np.unique(labels)
