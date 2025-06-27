@@ -19,7 +19,7 @@ from scipy.spatial.kdtree import KDTree
 import torch
 from tqdm import tqdm
 
-import globals
+import pcnn.globals
 
 
 def _triangular_number(x: int) -> int:
