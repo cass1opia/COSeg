@@ -83,9 +83,16 @@ class S3DIS_base(Dataset):
             os.path.dirname(self.data_root), "class2scans.pkl"
         )
         if os.path.exists(class2scans_file):
+            print(f"Loading existing class2scans from: {class2scans_file}")
             with open(class2scans_file, "rb") as f:
                 class2scans = pickle.load(f)
         else:
+            print("=" * 80)
+            print("BUILDING CLASS-TO-SCANS MAPPING")
+            print(f"Scanning data root: {self.data_root}")
+            print(f"Minimum ratio: 0.05 (5%)")
+            print(f"Minimum points: 100")
+            print("=" * 80)
             min_ratio = (
                 0.05  # to filter out scans with only rare labelled points
             )
@@ -97,11 +104,13 @@ class S3DIS_base(Dataset):
                 data = np.load(file)
                 labels = data[:, 6].astype(np.int)
                 classes = np.unique(labels)
-                print(
-                    "{0} | shape: {1} | classes: {2}".format(
-                        scan_name, data.shape, list(classes)
+                # Only show scan details for small datasets
+                if len(glob.glob(os.path.join(self.data_root, "*.npy"))) <= 20:
+                    print(
+                        "{0} | shape: {1} | classes: {2}".format(
+                            scan_name, data.shape, list(classes)
+                        )
                     )
-                )
                 for class_id in classes:
                     # if the number of points for the target class is too few,
                     # do not add this sample into the dictionary
@@ -124,6 +133,23 @@ class S3DIS_base(Dataset):
 
             with open(class2scans_file, "wb") as f:
                 pickle.dump(class2scans, f, pickle.HIGHEST_PROTOCOL)
+            
+            print("-" * 80)
+            print("CLASS-TO-SCANS MAPPING COMPLETED")
+            print(f"Mapping saved to: {class2scans_file}")
+            
+        # Log class2scans statistics
+        print("\nClass-to-Scans Statistics:")
+        print(f"{'Class':<15} {'ID':<5} {'Scans':<10} {'Sample Scans (first 3)'}")
+        print("-" * 80)
+        for class_id in range(self.class_count):
+            if class_id < len(self.class_names):
+                class_name = self.class_names[class_id]
+                scan_count = len(class2scans[class_id])
+                sample_scans = class2scans[class_id][:3]
+                print(f"{class_name:<15} {class_id:<5} {scan_count:<10} {sample_scans}")
+        print("=" * 80)
+        
         return class2scans
 
 
@@ -262,7 +288,7 @@ class S3DIS_FS(S3DIS_base):
         }
         print("Classes: {0} in {1} set".format(self.classes, split))
 
-    def get_test_episode(self, n_way_classes=None):
+    def get_test_episode(self, n_way_classes=None, verbose=False):
         """Generate a test episode without base lables."""
         if n_way_classes is not None:
             sampled_classes = np.array(n_way_classes)
@@ -270,6 +296,9 @@ class S3DIS_FS(S3DIS_base):
             sampled_classes = np.random.choice(
                 self.classes, self.n_way, replace=False
             )
+        
+        if verbose:
+            print(f"    Generating episode for classes: {sampled_classes}")
 
         support_ptclouds, support_masks, query_ptclouds, query_labels = (
             [],
@@ -692,34 +721,109 @@ class S3DIS_FS_TEST(Dataset):
             raise NotImplementedError("Mode (%s) is unknown!" % split)
 
     def prepare_test_data(self):
+        import time
+        start_time = time.time()
+        
         if os.path.exists(self.test_data_path):
             self.file_names = glob.glob(
                 os.path.join(self.test_data_path, "*.pt")
             )
             self.num_episode = len(self.file_names)
+            print("=" * 80)
+            print("Loading Pre-generated Test Episodes")
+            print(f"Test data path: {self.test_data_path}")
+            print(f"Found {self.num_episode} pre-generated episodes")
+            print(f"Configuration: {self.n_way}-way {self.k_shot}-shot")
+            print(f"Classes: {self.classes}")
+            print("=" * 80)
         else:
-            print(
-                f"Test dataset ({self.test_data_path}) does not exist...\n Constructing..."
-            )
+            print("=" * 80)
+            print("GENERATING NEW TEST EPISODES")
+            print(f"Test data path: {self.test_data_path}")
+            print(f"Configuration: {self.n_way}-way {self.k_shot}-shot")
+            print(f"Classes: {self.classes} (total: {len(self.classes)})")
+            print("=" * 80)
+            
             os.mkdir(self.test_data_path)
 
             class_comb = list(
                 combinations(self.classes, self.n_way)
             )  # [(),...]
             self.num_episode = len(class_comb) * self.num_episode_per_comb
+            
+            print(f"Class combinations: {len(class_comb)}")
+            print(f"Episodes per combination: {self.num_episode_per_comb}")
+            print(f"Total episodes to generate: {self.num_episode}")
+            print("-" * 80)
+            
+            # Log class combinations
+            for i, comb in enumerate(class_comb):
+                print(f"Combination {i+1}/{len(class_comb)}: {comb}")
+            print("-" * 80)
 
             episode_ind = 0
             self.file_names = []
-            for sampled_classes in class_comb:
+            total_points = 0
+            
+            for comb_idx, sampled_classes in enumerate(class_comb):
                 sampled_classes = list(sampled_classes)
-                for _ in range(self.num_episode_per_comb):
-                    data = self.dataset.get_test_episode(sampled_classes)
+                print(f"Processing combination {comb_idx+1}/{len(class_comb)}: {sampled_classes}")
+                
+                for ep_idx in range(self.num_episode_per_comb):
+                    episode_start = time.time()
+                    # Enable verbose logging for first few episodes
+                    verbose_logging = episode_ind < 3
+                    data = self.dataset.get_test_episode(sampled_classes, verbose=verbose_logging)
                     out_filename = os.path.join(
                         self.test_data_path, f"{episode_ind}.pt"
                     )
+                    
+                    # Calculate episode statistics
+                    support_feat, support_label, query_feat, query_label, _ = data
+                    support_points = sum(feat.shape[0] for feat in support_feat)
+                    query_points = sum(feat.shape[0] for feat in query_feat)
+                    episode_total_points = support_points + query_points
+                    total_points += episode_total_points
+                    
                     write_episode(out_filename, data)
                     self.file_names.append(out_filename)
+                    
+                    episode_time = time.time() - episode_start
+                    progress = (episode_ind + 1) / self.num_episode * 100
+                    
+                    if (ep_idx + 1) % max(1, self.num_episode_per_comb // 4) == 0 or ep_idx == 0:
+                        print(f"  Episode {ep_idx+1}/{self.num_episode_per_comb} - "
+                              f"Support: {support_points} pts, Query: {query_points} pts, "
+                              f"Time: {episode_time:.2f}s, Progress: {progress:.1f}%")
+                    
                     episode_ind += 1
+                
+                elapsed_time = time.time() - start_time
+                avg_time_per_episode = elapsed_time / episode_ind if episode_ind > 0 else 0
+                eta = (self.num_episode - episode_ind) * avg_time_per_episode
+                print(f"  Combination {comb_idx+1} completed - "
+                      f"Elapsed: {elapsed_time:.1f}s, ETA: {eta:.1f}s")
+                print()
+            
+            total_time = time.time() - start_time
+            avg_points_per_episode = total_points / self.num_episode if self.num_episode > 0 else 0
+            
+            print("=" * 80)
+            print("TEST EPISODE GENERATION COMPLETED")
+            print(f"Total episodes generated: {self.num_episode}")
+            print(f"Total time: {total_time:.1f}s ({total_time/60:.1f} minutes)")
+            print(f"Average time per episode: {total_time/self.num_episode:.2f}s")
+            print(f"Total points processed: {total_points:,}")
+            print(f"Average points per episode: {avg_points_per_episode:.0f}")
+            print(f"Episodes per second: {self.num_episode/total_time:.2f}")
+            print(f"Points per second: {total_points/total_time:.0f}")
+            print(f"Data saved to: {self.test_data_path}")
+            print("=" * 80)
+    
+    # Alias for the correct function name (fixing typo)
+    def prepare_test_data(self):
+        """Alias for prepare_testt_data to fix the typo."""
+        return self.prepare_testt_data()
 
     def __len__(self):
         return self.num_episode
@@ -733,18 +837,33 @@ def write_episode(out_filename, data):
     support_feat, support_label, query_feat, query_label, sampled_classes = (
         data
     )
-    torch.save(
-        {
-            "support_feat": support_feat,
-            "support_label": support_label,
-            "query_feat": query_feat,
-            "query_label": query_label,
-            "sampled_classes": sampled_classes,
-        },
-        out_filename,
-    )
-
-    print("\t {0} saved! | classes: {1}".format(out_filename, sampled_classes))
+    
+    # Calculate episode statistics
+    support_points = sum(feat.shape[0] for feat in support_feat)
+    query_points = sum(feat.shape[0] for feat in query_feat)
+    total_points = support_points + query_points
+    
+    # Calculate file size estimation
+    episode_data = {
+        "support_feat": support_feat,
+        "support_label": support_label,
+        "query_feat": query_feat,
+        "query_label": query_label,
+        "sampled_classes": sampled_classes,
+    }
+    
+    torch.save(episode_data, out_filename)
+    
+    # Get actual file size
+    file_size = os.path.getsize(out_filename)
+    file_size_mb = file_size / (1024 * 1024)
+    
+    # Only print detailed info for every 10th episode or first few episodes
+    episode_num = int(os.path.basename(out_filename).split('.')[0])
+    if episode_num < 5 or episode_num % 10 == 0:
+        print(f"\t Episode {episode_num} saved: {os.path.basename(out_filename)} | "
+              f"Classes: {sampled_classes} | Points: {total_points:,} | "
+              f"Size: {file_size_mb:.2f}MB")
 
 
 def read_episode(file_name):
