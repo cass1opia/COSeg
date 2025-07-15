@@ -80,9 +80,11 @@ def main_process():
 
 def main():
     args = get_parser()
+    print("not crashed")
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(
         str(x) for x in args.train_gpu
     )
+    print("not crashed after cuda")
     if not os.path.exists(args.save_path):
         os.makedirs(args.save_path)
     # import torch.backends.mkldnn
@@ -119,6 +121,7 @@ def main():
 
 
 def main_worker(gpu, ngpus_per_node, argss):
+    print("Im in the main worker")
     global args, best_iou
     args, best_iou = argss, 0
     if args.distributed:
