@@ -747,12 +747,12 @@ class MultiPointCloudLoaderFS:
                 
                 for class_id in unique_classes:
                     if class_id in self.class_ids:  # Check against all class_ids
-                        # num_points = np.count_nonzero(labels == class_id)
-                        # total_points = len(labels)
-                        # threshold = max(int(total_points * min_ratio), min_pts)
-                        #
-                        # if num_points > threshold:
-                        all_class2files[class_id].append(file_idx)
+                        num_points = np.count_nonzero(labels == class_id)
+                        total_points = len(labels)
+                        threshold = max(int(total_points * min_ratio), min_pts)
+                        
+                        if num_points > threshold:
+                            all_class2files[class_id].append(file_idx)
             
             os.makedirs(self.cache_dir, exist_ok=True)
             with open(cache_file, "wb") as f:
