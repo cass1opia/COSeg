@@ -89,5 +89,5 @@ Distributed:
 
 TEST:
   test: True
-  eval_split: val # split for eval in [val or test], should be set to 'test' if test is True
+  eval_split: 'test' # split for eval in [val or test], should be set to 'test' if test is True
 
