@@ -783,6 +783,18 @@ def validate(val_loader, model, valid_calsses):
 
     torch.cuda.empty_cache()
     model.eval()
+    
+    # Enhanced logging for test progress
+    if main_process():
+        logger.info("=" * 80)
+        logger.info("Starting Test Evaluation")
+        logger.info(f"Total test episodes: {len(val_loader)}")
+        logger.info(f"Test classes: {valid_calsses}")
+        logger.info(f"Print frequency: every {args.print_freq} episodes")
+        logger.info(f"Config: {args.n_way}-way {args.k_shot}-shot")
+        logger.info(f"Ignore label: {args.ignore_label}")
+        logger.info("=" * 80)
+    
     end = time.time()
     for i, batch in enumerate(val_loader):
         if args.forvis:
@@ -808,9 +820,18 @@ def validate(val_loader, model, valid_calsses):
             ) = batch
 
         data_time.update(time.time() - end)
+        
+        # Log episode progress
+        if main_process() and (i + 1) % max(1, args.print_freq // 4) == 0:
+            progress_pct = (i + 1) / len(val_loader) * 100
+            logger.info(f"Episode [{i+1}/{len(val_loader)}] ({progress_pct:.1f}%) - Classes: {sampled_classes}")
 
         query_y = query_y.cuda(non_blocking=True)
 
+        # Log model forward pass
+        if main_process() and (i + 1) % max(1, args.print_freq // 2) == 0:
+            logger.info(f"Episode [{i+1}] - Forward pass - Support: {support_x.shape[0]} pts, Query: {query_x.shape[0]} pts")
+        
         with torch.no_grad():
             output, loss = model(
                 support_offset,
@@ -832,6 +853,12 @@ def validate(val_loader, model, valid_calsses):
             n = count.item()
             loss /= n
 
+        # Log prediction results
+        if main_process() and (i + 1) % max(1, args.print_freq // 2) == 0:
+            unique_preds = torch.unique(output)
+            unique_targets = torch.unique(query_y)
+            logger.info(f"Episode [{i+1}] - Preds: {unique_preds.tolist()}, Targets: {unique_targets.tolist()}")
+        
         intersection, union, target = evaluate_metric(
             output, query_y, sampled_classes, valid_calsses, args.ignore_label
         )
@@ -882,21 +909,48 @@ def validate(val_loader, model, valid_calsses):
         loss_meter.update(loss.item(), n)
         batch_time.update(time.time() - end)
         end = time.time()
+        
+        # Log every single episode for the first 10 episodes
+        if main_process() and i < 10:
+            logger.info(f"Completed Episode [{i+1}] - Classes: {sampled_classes} - Acc: {accuracy:.4f} - Time: {batch_time.val:.3f}s")
+        
         if (i + 1) % args.print_freq == 0 and main_process():
+            progress_pct = (i + 1) / len(val_loader) * 100
+            current_iou = sum(intersection_meter.val) / (sum(union_meter.val) + 1e-10)
+            eta_seconds = (len(val_loader) - i - 1) * batch_time.avg
+            eta_minutes = eta_seconds / 60
+            
             logger.info(
-                "Test: [{}/{}] "
+                "Test: [{}/{}] ({:.1f}%) "
                 "Data {data_time.val:.3f} ({data_time.avg:.3f}) "
                 "Batch {batch_time.val:.3f} ({batch_time.avg:.3f}) "
                 "Loss {loss_meter.val:.4f} ({loss_meter.avg:.4f}) "
-                "Accuracy {accuracy:.4f}.".format(
+                "Accuracy {accuracy:.4f} "
+                "IoU {current_iou:.4f} "
+                "ETA {eta_minutes:.1f}min".format(
                     i + 1,
                     len(val_loader),
+                    progress_pct,
                     data_time=data_time,
                     batch_time=batch_time,
                     loss_meter=loss_meter,
                     accuracy=accuracy,
+                    current_iou=current_iou,
+                    eta_minutes=eta_minutes,
                 )
             )
+            
+            # Log intermediate results every major checkpoint
+            if (i + 1) % (args.print_freq * 5) == 0:
+                current_miou = np.mean(intersection_meter.sum / (union_meter.sum + 1e-10))
+                current_macc = np.mean(intersection_meter.sum / (target_meter.sum + 1e-10))
+                current_allacc = sum(intersection_meter.sum) / (sum(target_meter.sum) + 1e-10)
+                logger.info("-" * 60)
+                logger.info(f"Intermediate Results at Episode [{i+1}]:")
+                logger.info(f"  mIoU: {current_miou:.4f}")
+                logger.info(f"  mAcc: {current_macc:.4f}")
+                logger.info(f"  allAcc: {current_allacc:.4f}")
+                logger.info("-" * 60)
 
     iou_class = intersection_meter.sum / (union_meter.sum + 1e-10)
     accuracy_class = intersection_meter.sum / (target_meter.sum + 1e-10)
@@ -904,17 +958,33 @@ def validate(val_loader, model, valid_calsses):
     mAcc = np.mean(accuracy_class)
     allAcc = sum(intersection_meter.sum) / (sum(target_meter.sum) + 1e-10)
     if main_process():
+        logger.info("=" * 80)
+        logger.info("Test Evaluation Completed")
+        logger.info(f"Total episodes processed: {len(val_loader)}")
+        logger.info(f"Total time: {batch_time.sum:.1f}s, Average time per episode: {batch_time.avg:.3f}s")
+        logger.info("=" * 80)
         logger.info(
-            "Val result: mIoU/mAcc/allAcc {:.4f}/{:.4f}/{:.4f}.".format(
+            "Final Results: mIoU/mAcc/allAcc {:.4f}/{:.4f}/{:.4f}.".format(
                 mIoU, mAcc, allAcc
             )
         )
+        logger.info("-" * 80)
+        logger.info("Per-Class Results:")
+        logger.info(f"{'Class':<15} {'IoU':<10} {'Accuracy':<10} {'Total Points':<15}")
+        logger.info("-" * 80)
         for i in range(len(valid_calsses)):
+            class_name = valid_calsses[i]
+            class_iou = iou_class[i]
+            class_acc = accuracy_class[i]
+            total_points = target_meter.sum[i]
             logger.info(
-                "Class_{} Result: iou/accuracy {:.4f}/{:.4f}.".format(
-                    valid_calsses[i], iou_class[i], accuracy_class[i]
-                )
+                f"{class_name:<15} {class_iou:<10.4f} {class_acc:<10.4f} {total_points:<15.0f}"
             )
+        logger.info("-" * 80)
+        logger.info(f"Best performing class (IoU): {valid_calsses[np.argmax(iou_class)]} ({np.max(iou_class):.4f})")
+        logger.info(f"Worst performing class (IoU): {valid_calsses[np.argmin(iou_class)]} ({np.min(iou_class):.4f})")
+        logger.info(f"IoU Standard Deviation: {np.std(iou_class):.4f}")
+        logger.info("=" * 80)
         logger.info("<<<<<<<<<<<<<<<<< End Evaluation <<<<<<<<<<<<<<<<<")
 
     return loss_meter.avg, mIoU, mAcc, allAcc
