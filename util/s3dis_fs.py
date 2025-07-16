@@ -38,7 +38,7 @@ class S3DIS_base(Dataset):
         #           4:'column', 5:'window', 6:'door', 7:'table',
         #           8:'chair', 9:'sofa', 10:'bookcase', 11:'board', 12:'clutter'}
         self.class_count = 13
-        class_names = open(
+        self.class_names = open(
             os.path.join(
                 os.path.dirname(os.path.dirname(data_root)),
                 "meta",
