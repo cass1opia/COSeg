@@ -720,7 +720,7 @@ class S3DIS_FS_TEST(Dataset):
         else:
             raise NotImplementedError("Mode (%s) is unknown!" % split)
 
-    def prepare_test_data(self):
+    def prepare_testt_data(self):
         import time
         start_time = time.time()
         
