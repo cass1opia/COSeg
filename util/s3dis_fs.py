@@ -46,7 +46,7 @@ class S3DIS_base(Dataset):
             )
         ).readlines()
         self.class2type = {
-            i: name.strip() for i, name in enumerate(class_names)
+            i: name.strip() for i, name in enumerate(self.class_names)
         }
         print(self.class2type)
         self.type2class = {self.class2type[t]: t for t in self.class2type}
