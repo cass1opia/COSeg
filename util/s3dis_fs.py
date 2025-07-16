@@ -689,6 +689,7 @@ class S3DIS_FS_TEST(Dataset):
         )
         self.classes = self.dataset.classes
         self.n_way = n_way
+        self.k_shot = k_shot
         self.num_episode_per_comb = num_episode_per_comb
 
         if split == "val":
