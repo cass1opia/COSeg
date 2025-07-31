@@ -54,6 +54,7 @@ def room2blocks(data, block_size, stride, min_npts):
         cond = xcond & ycond
         if(np.sum(cond)<min_npts):
             logger.info(f"Skipping block {idx} because it has less than {min_npts} points")
+            logger.info(f"Block {idx} has {np.sum(cond)} points")
             continue
         if (
             np.all(data[cond, 6] == 0)
