@@ -1,12 +1,18 @@
 import os
+import sys
 import numpy as np
+
+# Füge das aktuelle Verzeichnis zum Python-Pfad hinzu
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from util.logger import get_logger
+
 
 def map_street_sign_class(data):
     data[:, 6] = np.where(data[:, 6] == 15, data[:, 7], data[:, 6] + 13)
     data = np.delete(data, 7, axis=1)
     return data
-    
+
 
 if __name__ == "__main__":
     import argparse
