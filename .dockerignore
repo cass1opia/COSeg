@@ -1,0 +1,51 @@
+# Git files
+.git
+.gitignore
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+logs/
+tmp/
+temp/
+
+# Model weights and data (these should be mounted as volumes)
+*.pth
+*.pt
+*.ckpt
+data/
+models/
+results/
+wandb/
+
+# Documentation and images
+*.md
+figs/
+docs/
+
+# Docker files
+Dockerfile*
+docker-compose* 

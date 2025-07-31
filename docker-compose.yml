@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  coseg:
+    build: .
+    image: coseg:latest
+    container_name: coseg-container
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      # Mount data directory
+      - ./data:/workspace/data
+      # Mount models directory for saving/loading weights
+      - ./models:/workspace/models
+      # Mount results directory
+      - ./results:/workspace/results
+      # Mount logs directory
+      - ./logs:/workspace/logs
+      # Mount config directory (in case you want to modify configs)
+      - ./config:/workspace/config
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    shm_size: '8gb'  # Increase shared memory for PyTorch DataLoader
+    
+  # Optional: Jupyter notebook service
+  jupyter:
+    build: .
+    image: coseg:latest
+    container_name: coseg-jupyter
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - ./data:/workspace/data
+      - ./models:/workspace/models
+      - ./results:/workspace/results
+      - ./logs:/workspace/logs
+      - ./config:/workspace/config
+      - ./notebooks:/workspace/notebooks
+    working_dir: /workspace
+    ports:
+      - "8888:8888"
+    command: >
+      bash -c "pip install jupyter &&
+               jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token=''"
+    shm_size: '8gb'
+    
+  # Optional: TensorBoard service
+  tensorboard:
+    build: .
+    image: coseg:latest
+    container_name: coseg-tensorboard
+    volumes:
+      - ./logs:/workspace/logs
+    working_dir: /workspace
+    ports:
+      - "6006:6006"
+    command: tensorboard --logdir=/workspace/logs --host=0.0.0.0 --port=6006 
