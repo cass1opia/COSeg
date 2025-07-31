@@ -2,16 +2,18 @@ import os
 import numpy as np
 from util.logger import get_logger
 
-
 def map_street_sign_class(data):
-    data[:, 7] = np.where(data[:, 6] == 15, data[:, 7], 0)
+    data[:, 6] = np.where(data[:, 6] == 15, data[:, 7], data[:, 6] + 13)
+    data = np.delete(data, 7, axis=1)
     return data
-
+    
 
 if __name__ == "__main__":
     import argparse
 
-    logger = get_logger()
+    logger = get_logger(name="collect_outdoor_data")
+    logger.info("Starting to collect outdoor data")
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--data_path",
@@ -33,6 +35,7 @@ if __name__ == "__main__":
 
     txt_files = [f for f in os.listdir(DATA_PATH) if f.endswith(".txt")]
     for txt_file in txt_files:
+        logger.info(f"Processing {txt_file}")
         data = np.loadtxt(os.path.join(DATA_PATH, txt_file), delimiter=",", skiprows=1)
         data = map_street_sign_class(data)
         np.save(
