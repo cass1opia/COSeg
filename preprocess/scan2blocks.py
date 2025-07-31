@@ -54,13 +54,12 @@ def room2blocks(data, block_size, stride, min_npts):
         ycond = (xyz[:, 1] <= ybeg + block_size) & (xyz[:, 1] >= ybeg)
         cond = xcond & ycond
         if(np.sum(cond)<min_npts):
-            logger.info(f"Skipping block {idx} because it has less than {min_npts} points")
-            logger.info(f"Block {idx} has {np.sum(cond)} points")
+            logger.info(f"Skipping block {idx} because it has less than {min_npts} points \t {len(blocks_list)}/{len(xbeg_list)}")
             continue
         if (
             np.all(data[cond, 6] == 0)
         ):  # discard block if there are less than 100 pts.
-            logger.info(f"Skipping block {idx} because it has only class 0")
+            logger.info(f"Skipping block {idx} because it has only class 0 \t {len(blocks_list)}/{len(xbeg_list)}")
             continue
 
         block = data[cond, :]
