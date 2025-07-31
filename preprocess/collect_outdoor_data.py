@@ -31,7 +31,7 @@ if __name__ == "__main__":
 
     txt_files = [f for f in os.listdir(DATA_PATH) if f.endswith(".txt")]
     for txt_file in txt_files:
-        data = np.loadtxt(os.path.join(DATA_PATH, txt_file), delimiter=" ", skiprows=1)
+        data = np.loadtxt(os.path.join(DATA_PATH, txt_file), delimiter=",", skiprows=1)
         data = map_street_sign_class(data)
         np.save(
             os.path.join(SAVE_PATH, txt_file.replace(".txt", "_processed.npy")), data
