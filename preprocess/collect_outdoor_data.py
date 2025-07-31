@@ -6,12 +6,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from util.logger import get_logger
 
-
 def map_street_sign_class(data):
     data[:, 6] = np.where(data[:, 6] == 15, data[:, 7], data[:, 6] + 13)
     data = np.delete(data, 7, axis=1)
     return data
-
+    
 
 if __name__ == "__main__":
     import argparse
@@ -43,6 +42,8 @@ if __name__ == "__main__":
         logger.info(f"Processing {txt_file}")
         data = np.loadtxt(os.path.join(DATA_PATH, txt_file), delimiter=",", skiprows=1)
         data = map_street_sign_class(data)
+        file_name = f"{txt_file.split('S')[0].strip()}_{txt_file.split('part')[-1].split('_')[0] if 'part' in txt_file else ''}_processed.npy"
+        logger.info(f"Saving to {os.path.join(SAVE_PATH, file_name)} with shape {data.shape}")
         np.save(
-            os.path.join(SAVE_PATH, txt_file.replace(".txt", "_processed.npy")), data
+            os.path.join(SAVE_PATH, file_name), data
         )
