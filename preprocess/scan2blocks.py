@@ -4,6 +4,7 @@
 import os
 import glob
 import numpy as np
+from util.logger import get_logger
 
 # -----------------------------------------------------------------------------
 # PREPARE BLOCK DATA FOR SUPERPOINT GRAPH GENERATION
@@ -11,6 +12,7 @@ import numpy as np
 
 
 def room2blocks(data, block_size, stride, min_npts):
+
     """Prepare block data.
     Args:
         data: N x 7 numpy array, 012 are XYZ in meters, 345 are RGB in [0,255], 6 is the labels
@@ -20,6 +22,7 @@ def room2blocks(data, block_size, stride, min_npts):
     Returns:
         blocks_list: a list of blocks, each block is a num_point x 7 np array
     """
+    logger = get_logger(name="scan2blocks")
     assert stride <= block_size
 
     xyz = data[:, :3]
@@ -45,9 +48,13 @@ def room2blocks(data, block_size, stride, min_npts):
         xcond = (xyz[:, 0] <= xbeg + block_size) & (xyz[:, 0] >= xbeg)
         ycond = (xyz[:, 1] <= ybeg + block_size) & (xyz[:, 1] >= ybeg)
         cond = xcond & ycond
+        if(np.sum(cond)<min_npts):
+            logger.info(f"Skipping block {idx} because it has less than {min_npts} points")
+            continue
         if (
-            np.sum(cond) < min_npts
+            np.all(data[cond, 6] == 0)
         ):  # discard block if there are less than 100 pts.
+            logger.info(f"Skipping block {idx} because it has only class 0")
             continue
 
         block = data[cond, :]
