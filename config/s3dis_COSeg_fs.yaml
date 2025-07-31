@@ -1,6 +1,6 @@
 DATA:
   data_name: s3dis
-  data_root: # Fill in the pre-processed data path (which contains the .npy files)
+  data_root: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/S3DIS/Stanford3dDataset_v1.2_Aligned_Version/scenes/data
   classes: 13
   fea_dim: 6
   voxel_size: 0.02
@@ -62,7 +62,7 @@ TRAIN:
   print_freq: 1
   save_freq: 1
   save_path: ./saved_models # Fill the path to store the trained model
-  weight:  # path to initial weight (default: none)
+  weight:  /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/S3DIS/pretrained_weights/model/model_best.pth
   resume:  # path to latest checkpoint (default: none)
   evaluate: True  # evaluate on validation set, extra gpu memory needed and small batch_size_val is recommend
   eval_freq: 1
@@ -73,7 +73,7 @@ Few-shot:
   k_shot: 1
   n_queries: 1
   num_episode_per_comb: 1000
-  pretrain_backbone:
+  pretrain_backbone: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/S3DIS/pretrained_backbone_weights/s3_s1pre_1/s3_s1pre
   n_subprototypes: 100
   vis: 0
   forvis: 0
