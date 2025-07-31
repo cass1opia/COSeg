@@ -1,11 +1,11 @@
 """ Split room into blocks
 """
 import sys
+import os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-import os
 import glob
 import numpy as np
 from util.logger import get_logger
