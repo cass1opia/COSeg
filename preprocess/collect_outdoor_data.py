@@ -3,7 +3,7 @@ import numpy as np
 
 
 def map_street_sign_class(data):
-    data[:, 9] = np.where(data[:, 8] == 15, data[:, 9], 0)
+    data[:, 7] = np.where(data[:, 6] == 15, data[:, 7], 0)
     return data
 
 
