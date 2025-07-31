@@ -1,5 +1,6 @@
 import os
 import numpy as np
+from util.logger import get_logger
 
 
 def map_street_sign_class(data):
@@ -10,6 +11,7 @@ def map_street_sign_class(data):
 if __name__ == "__main__":
     import argparse
 
+    logger = get_logger()
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--data_path",
