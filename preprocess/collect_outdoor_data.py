@@ -42,7 +42,7 @@ if __name__ == "__main__":
         logger.info(f"Processing {txt_file}")
         data = np.loadtxt(os.path.join(DATA_PATH, txt_file), delimiter=",", skiprows=1)
         data = map_street_sign_class(data)
-        file_name = f"{txt_file.split('S')[0].strip()}_{txt_file.split('part')[-1].split('.')[0] if 'part' in txt_file else ''}_processed.npy".strip()
+        file_name = f"{txt_file.split('S')[0].trim()}_{txt_file.split('part')[-1].split('.')[0] if 'part' in txt_file else ''}_processed.npy".trim()
         logger.info(f"Saving to {os.path.join(SAVE_PATH, file_name)} with shape {data.shape}")
         np.set_printoptions(suppress=True)
         np.save(
