@@ -46,6 +46,7 @@ def room2blocks(data, block_size, stride, min_npts):
 
     # Collect blocks
     blocks_list = []
+    logger.info(f"Processing {len(xbeg_list)} blocks")
     for idx in range(len(xbeg_list)):
         xbeg = xbeg_list[idx]
         ybeg = ybeg_list[idx]
@@ -64,6 +65,7 @@ def room2blocks(data, block_size, stride, min_npts):
 
         block = data[cond, :]
         blocks_list.append(block)
+        logger.info(f"Added block {idx} with {np.sum(cond)} points")
 
     return blocks_list
 
