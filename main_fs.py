@@ -25,6 +25,7 @@ from functools import partial
 from util import config
 from util.s3dis_fs import S3DIS_FS, S3DIS_FS_TEST, S3DIS_FSForVIS
 from util.scannet_v2_fs import Scannetv2_FS, Scannetv2_FS_TEST
+from util.outdoor_fs import Outdoor_FS, Outdoor_FS_TEST, Outdoor_FSForVIS
 from util.common_util import (
     AverageMeter,
     find_free_port,
@@ -302,6 +303,36 @@ def main_worker(gpu, ngpus_per_node, argss):
             num_episode_per_comb=args.num_episode_per_comb,
         )
         valid_calsses = list(val_data.classes)
+    elif args.data_name == "outdoor":
+        if args.forvis:
+            val_data = Outdoor_FSForVIS(
+                split="test",
+                data_root=args.data_root,
+                voxel_size=args.voxel_size,
+                voxel_max=args.voxel_max,
+                transform=val_transform,
+                cvfold=args.cvfold,
+                num_episode=args.num_episode,
+                n_way=args.n_way,
+                k_shot=args.k_shot,
+                n_queries=args.n_queries,
+                target_class=args.target_class,
+            )
+        else:
+            val_data = Outdoor_FS_TEST(
+                split=args.eval_split,
+                data_root=args.data_root,
+                voxel_size=args.voxel_size,
+                voxel_max=args.voxel_max,
+                transform=val_transform,
+                cvfold=args.cvfold,
+                num_episode=args.num_episode,
+                n_way=args.n_way,
+                k_shot=args.k_shot,
+                n_queries=args.n_queries,
+                num_episode_per_comb=args.num_episode_per_comb,
+            )
+        valid_calsses = list(val_data.classes)
     else:
         raise ValueError(
             "The dataset {} is not supported.".format(args.data_name)
@@ -408,6 +439,50 @@ def main_worker(gpu, ngpus_per_node, argss):
             )
 
         train_data = Scannetv2_FS(
+            split="train",
+            data_root=args.data_root,
+            voxel_size=args.voxel_size,
+            voxel_max=args.voxel_max,
+            transform=train_transform,
+            shuffle_index=True,
+            loop=args.loop,
+            cvfold=args.cvfold,
+            num_episode=args.num_episode,
+            n_way=args.n_way,
+            k_shot=args.k_shot,
+            n_queries=args.n_queries,
+        )
+        train_calsses = list(train_data.classes)
+    elif args.data_name == "outdoor":
+        train_transform = None
+        if args.aug:
+            jitter_sigma = args.get("jitter_sigma", 0.01)
+            jitter_clip = args.get("jitter_clip", 0.05)
+            if main_process():
+                logger.info("augmentation all")
+                logger.info(
+                    "jitter_sigma: {}, jitter_clip: {}".format(
+                        jitter_sigma, jitter_clip
+                    )
+                )
+            train_transform = transform.Compose(
+                [
+                    transform.RandomRotate(
+                        along_z=args.get("rotate_along_z", True)
+                    ),
+                    transform.RandomScale(
+                        scale_low=args.get("scale_low", 0.8),
+                        scale_high=args.get("scale_high", 1.2),
+                    ),
+                    transform.RandomJitter(
+                        sigma=jitter_sigma, clip=jitter_clip
+                    ),
+                    transform.RandomDropColor(
+                        color_augment=args.get("color_augment", 0.0)
+                    ),
+                ]
+            )
+        train_data = Outdoor_FS(
             split="train",
             data_root=args.data_root,
             voxel_size=args.voxel_size,
