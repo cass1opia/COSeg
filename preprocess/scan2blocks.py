@@ -1,12 +1,14 @@
 """ Split room into blocks
 """
+import sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 import os
 import glob
-import sys
 import numpy as np
 from util.logger import get_logger
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # -----------------------------------------------------------------------------
 # PREPARE BLOCK DATA FOR SUPERPOINT GRAPH GENERATION
