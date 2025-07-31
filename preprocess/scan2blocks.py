@@ -110,7 +110,7 @@ if __name__ == "__main__":
     if not os.path.exists(SAVE_PATH):
         os.makedirs(SAVE_PATH)
 
-    file_paths = glob.glob(os.path.join(DATA_PATH, "data", "*.npy"))
+    file_paths = glob.glob(os.path.join(DATA_PATH, "*.npy"))
     print("{} scenes to be split...".format(len(file_paths)))
 
     block_cnt = 0
