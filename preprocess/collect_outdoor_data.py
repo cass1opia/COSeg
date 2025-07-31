@@ -44,6 +44,7 @@ if __name__ == "__main__":
         data = map_street_sign_class(data)
         file_name = f"{txt_file.split('S')[0].strip()}_{txt_file.split('part')[-1].split('_')[0] if 'part' in txt_file else ''}_processed.npy"
         logger.info(f"Saving to {os.path.join(SAVE_PATH, file_name)} with shape {data.shape}")
+        np.set_printoptions(suppress=True)
         logger.info(f"First 5 rows: {data[:5]}")
         np.save(
             os.path.join(SAVE_PATH, file_name), data
