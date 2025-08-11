@@ -86,6 +86,8 @@ def scan2blocks(data, block_size, stride, min_npts):
         blocks_list: a list of blocks, each block is a num_point x 7 np array
     """
     logger = get_logger(name="scan2blocks")
+    print(type(stride))
+    print(type(block_size))
     assert stride <= block_size
 
     xyz = data[:, :3]
