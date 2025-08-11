@@ -63,6 +63,31 @@ class COSeg(nn.Module):
                     7: 5,
                     9: 6,
                 }
+        elif args.data_name == "outdoor":
+            self.base_classes = 7
+            if args.cvfold == 0:
+                # Fold 0: Basic traffic signs are test classes
+                # Base classes: Specialized signs and markers
+                self.base_class_to_pred_label = {
+                    7: 1,   # DirectionSign
+                    9: 2,   # PriorityRoad
+                    10: 3,  # OneWayStreet
+                    11: 4,  # Zone
+                    12: 5,  # Exit
+                    13: 6,  # DistanceMarker
+                }
+            else:  # cvfold == 1
+                # Fold 1: Specialized signs are test classes
+                # Base classes: Basic traffic signs
+                self.base_class_to_pred_label = {
+                    1: 1,   # TrafficSign
+                    2: 2,   # StreetSign
+                    3: 3,   # CircularTrafficSign
+                    4: 4,   # OctagonalTrafficSign
+                    5: 5,   # RectangularTrafficSign
+                    6: 6,   # TriangularTrafficSign
+                    8: 7,   # FlippedTriangularTrafficSign
+                }
         else:
             self.base_classes = 10
             if args.cvfold == 1:
@@ -149,6 +174,8 @@ class COSeg(nn.Module):
 
         if self.args.data_name == "s3dis":
             agglayers = 2
+        elif self.args.data_name == "outdoor":
+            agglayers = 3
         else:
             agglayers = 4
 

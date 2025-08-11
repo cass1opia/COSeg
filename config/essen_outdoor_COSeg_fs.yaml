@@ -1,5 +1,5 @@
 DATA:
-  data_name: essen_outdoor
+  data_name: outdoor
   data_root: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/street-signs
   cache_dir: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/cache
   classes: 13
