@@ -36,13 +36,16 @@ class Outdoor_base(Dataset):
         self.data_root = data_root
         # Classes: Traffic sign classes from EssenOutdoor dataset
         self.class_count = 14
-        class_names = open(
-            os.path.join(
-                os.path.dirname(os.path.dirname(data_root)),
-                "meta",
-                "essen_classnames.txt",
-            )
-        ).readlines()
+        
+        essen_classnames_path = os.path.join(
+            os.path.dirname(os.path.dirname(data_root)),
+            "meta",
+            "essen_classnames.txt",
+        )
+        print("Path to essen_classnames.txt: ", essen_classnames_path)
+
+        class_names = open(essen_classnames_path).readlines()
+
         self.class2type = {
             i: name.strip() for i, name in enumerate(class_names) if name.strip()
         }
@@ -92,10 +95,13 @@ class Outdoor_base(Dataset):
         class2scans_file = os.path.join(
             os.path.dirname(self.data_root), "class2scans.pkl"
         )
+        print("Path to class2scans.pkl: ", class2scans_file)
+
         if os.path.exists(class2scans_file):
             with open(class2scans_file, "rb") as f:
                 class2scans = pickle.load(f)
         else:
+            print("Class2scans.pkl does not exist, building it...")
             min_ratio = (
                 0.05  # to filter out scans with only rare labelled points
             )
@@ -135,6 +141,7 @@ class Outdoor_base(Dataset):
 
             with open(class2scans_file, "wb") as f:
                 pickle.dump(class2scans, f, pickle.HIGHEST_PROTOCOL)
+            print("Class2scans.pkl built successfully and saved to ", class2scans_file)
         return class2scans
 
 

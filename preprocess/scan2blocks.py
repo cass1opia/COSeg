@@ -1,4 +1,4 @@
-""" Split room into blocks
+""" Split scan into blocks
 """
 import sys
 import os
@@ -15,7 +15,66 @@ from util.logger import get_logger
 # -----------------------------------------------------------------------------
 
 
-def room2blocks(data, block_size, stride, min_npts):
+def get_last_processed_scan(save_path):
+    """Find the latest modified file in the save_path/data directory and parse the scanname from it.
+    
+    Args:
+        save_path: Path to the save directory
+        
+    Returns:
+        last_scan_name: Name of the last processed scan, or None if no files exist
+    """
+    data_dir = os.path.join(save_path, "data")
+    if not os.path.exists(data_dir):
+        return None
+    
+    # Get all .npy files in the data directory
+    block_files = glob.glob(os.path.join(data_dir, "*.npy"))
+    if not block_files:
+        return None
+    
+    # Find the file with the latest modification time
+    latest_file = max(block_files, key=os.path.getmtime)
+    
+    # Parse scan name from filename (format: scanname_block_X.npy)
+    filename = os.path.basename(latest_file)
+    if "_block_" in filename:
+        scan_name = filename.split("_block_")[0]
+        return scan_name
+    
+    return None
+
+
+def filter_file_paths(file_paths, last_processed_scan):
+    """Filter file_paths to only include files from the last processed scan onwards.
+    
+    Args:
+        file_paths: List of file paths to process
+        last_processed_scan: Name of the last processed scan
+        
+    Returns:
+        filtered_paths: List of file paths from the last processed scan onwards
+    """
+    if last_processed_scan is None:
+        return file_paths
+    
+    # Find the index of the last processed scan
+    last_scan_index = -1
+    for i, file_path in enumerate(file_paths):
+        scan_name = os.path.basename(file_path)[:-4]  # Remove .npy extension
+        if scan_name == last_processed_scan:
+            last_scan_index = i
+            break
+    
+    if last_scan_index == -1:
+        # If we can't find the last processed scan, return all files
+        return file_paths
+    
+    # Return files from the last processed scan onwards (including it)
+    return file_paths[last_scan_index:]
+
+
+def scan2blocks(data, block_size, stride, min_npts):
 
     """Prepare block data.
     Args:
@@ -69,22 +128,22 @@ def room2blocks(data, block_size, stride, min_npts):
     return blocks_list
 
 
-def room2blocks_wrapper(room_path, block_size, stride, min_npts):
-    if room_path[-3:] == "txt":
-        data = np.loadtxt(room_path)
-    elif room_path[-3:] == "npy":
-        data = np.load(room_path)
+def scan2blocks_wrapper(scan_path, block_size, stride, min_npts):
+    if scan_path[-3:] == "txt":
+        data = np.loadtxt(scan_path)
+    elif scan_path[-3:] == "npy":
+        data = np.load(scan_path)
     else:
         print("Unknown file type! exiting.")
         exit()
-    return room2blocks(data, block_size, stride, min_npts)
+    return scan2blocks(data, block_size, stride, min_npts)
 
 
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="[Preprocessing] Split rooms into blocks"
+        description="[Preprocessing] Split scans into blocks"
     )
     parser.add_argument("--data_path", default="/sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/processed/")
     parser.add_argument(
@@ -96,9 +155,8 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--stride",
-        type=float,
         default=1,
-        help="stride of sliding window for splitting rooms, "
+        help="stride of sliding window for splitting scans, "
         "stride should be not larger than block size",
     )
     parser.add_argument(
@@ -120,25 +178,43 @@ if __name__ == "__main__":
         "blocks_bs{0}_s{1}".format(BLOCK_SIZE, STRIDE),
         "data",
     )
-    if not os.path.exists(SAVE_PATH):
+    
+    # Check if SAVE_PATH already exists and find the last processed scan
+    last_processed_scan = None
+    if os.path.exists(SAVE_PATH):
+        print(f"SAVE_PATH already exists: {SAVE_PATH}")
+        last_processed_scan = get_last_processed_scan(SAVE_PATH)
+        if last_processed_scan:
+            print(f"Last processed scan: {last_processed_scan}")
+        else:
+            print("No processed files found, starting from beginning")
+    else:
         os.makedirs(SAVE_PATH)
+        print(f"Created new SAVE_PATH: {SAVE_PATH}")
 
     file_paths = glob.glob(os.path.join(DATA_PATH, "*.npy"))
-    print("{} scenes to be split...".format(len(file_paths)))
-
+    print("{} scans to be split...".format(len(file_paths)))
+    
+    # Filter file paths if resuming from a previous run
+    if last_processed_scan:
+        original_count = len(file_paths)
+        file_paths = filter_file_paths(file_paths, last_processed_scan)
+        remaining_count = len(file_paths)
+        print(f"Resuming from after scan '{last_processed_scan}': {remaining_count}/{original_count} scans remaining")
+    
     block_cnt = 0
     for file_path in file_paths:
-        room_name = os.path.basename(file_path)[:-4]
-        blocks_list = room2blocks_wrapper(
+        scan_name = os.path.basename(file_path)[:-4]
+        blocks_list = scan2blocks_wrapper(
             file_path, block_size=BLOCK_SIZE, stride=STRIDE, min_npts=MIN_NPTS
         )
         print(
-            "{0} is split into {1} blocks.".format(room_name, len(blocks_list))
+            "{0} is split into {1} blocks.".format(scan_name, len(blocks_list))
         )
         block_cnt += len(blocks_list)
 
         for i, block_data in enumerate(blocks_list):
-            block_filename = room_name + "_block_" + str(i) + ".npy"
+            block_filename = scan_name + "_block_" + str(i) + ".npy"
             np.save(os.path.join(SAVE_PATH, block_filename), block_data)
 
     print("Total samples: {0}".format(block_cnt))
