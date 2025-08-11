@@ -174,7 +174,8 @@ if __name__ == "__main__":
 
     DATA_PATH = args.data_path
     BLOCK_SIZE = args.block_size
-    STRIDE = args.stride
+    STRIDE = str(args.stride)
+    
     MIN_NPTS = args.min_npts
     SAVE_PATH = os.path.join(
         os.path.dirname(DATA_PATH),
