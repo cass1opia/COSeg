@@ -174,12 +174,12 @@ if __name__ == "__main__":
 
     DATA_PATH = args.data_path
     BLOCK_SIZE = args.block_size
-    STRIDE = str(args.stride)
+    STRIDE = args.stride
     
     MIN_NPTS = args.min_npts
     SAVE_PATH = os.path.join(
         os.path.dirname(DATA_PATH),
-        "blocks_bs{0}_s{1}".format(BLOCK_SIZE, STRIDE),
+        "blocks_bs{0}_s{1}".format(BLOCK_SIZE, str(STRIDE)),
         "data",
     )
     
