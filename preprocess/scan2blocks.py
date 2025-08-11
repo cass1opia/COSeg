@@ -179,7 +179,7 @@ if __name__ == "__main__":
     MIN_NPTS = args.min_npts
     SAVE_PATH = os.path.join(
         os.path.dirname(DATA_PATH),
-        "blocks_bs{0}_s{1}".format(BLOCK_SIZE, str(int(STRIDE))),
+        "blocks_bs{0}_s{1}".format(BLOCK_SIZE, STRIDE),
         "data",
     )
     
