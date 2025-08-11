@@ -157,6 +157,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--stride",
+        type=float,
         default=1,
         help="stride of sliding window for splitting scans, "
         "stride should be not larger than block size",
