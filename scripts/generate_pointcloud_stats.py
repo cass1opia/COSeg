@@ -47,7 +47,7 @@ def analyze_pointcloud(file_path):
         xyz_max = np.amax(xyz, axis=0)
         # Labels extrahieren (falls vorhanden, sonst alle 0)
 
-        print(xyz[:2,:])
+        print(pointcloud[:2])
         if pointcloud.shape[1] >= 4:
             labels = pointcloud[:, 3]
         else:
