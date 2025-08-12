@@ -24,8 +24,8 @@ def get_last_processed_scan(save_path):
     Returns:
         last_scan_name: Name of the last processed scan, or None if no files exist
     """
-    data_dir = os.path.join(save_path, "data")
-    print(data_dir)
+
+    data_dir = save_path
     if not os.path.exists(data_dir):
         return None
     
