@@ -44,7 +44,6 @@ def analyze_pointcloud(file_path):
         xyz = pointcloud[:, :3]
         xyz_min = np.amin(xyz, axis=0)
         xyz -= xyz_min
-        xyz_max = np.amax(xyz, axis=0)
 
         print(np.amin(xyz, axis=0))
         # Labels aus der 7. Spalte (Index 6) extrahieren
@@ -54,12 +53,12 @@ def analyze_pointcloud(file_path):
         stats = {
             'gesamtpunktanzahl': len(pointcloud),
             'streetsign_amount': np.sum(labels != 0),
-            'min_x': xyz_min[0],
-            'max_x': xyz_max[0],
-            'min_y': xyz_min[1],
-            'max_y': xyz_max[1],
-            'min_z': xyz_min[2],
-            'max_z': xyz_max[2]
+            'min_x': np.amin(xyz[:, 0]),
+            'max_x': np.amax(xyz[:, 0]),
+            'min_y': np.amin(xyz[:, 1]),
+            'max_y': np.amax(xyz[:, 1]),
+            'min_z': np.amin(xyz[:, 2]),
+            'max_z': np.amax(xyz[:, 2])
         }
         
         return stats
