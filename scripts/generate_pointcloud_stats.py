@@ -45,13 +45,8 @@ def analyze_pointcloud(file_path):
         xyz_min = np.amin(xyz, axis=0)
         xyz -= xyz_min
         xyz_max = np.amax(xyz, axis=0)
-        # Labels extrahieren (falls vorhanden, sonst alle 0)
-
-        print(pointcloud[:2])
-        if pointcloud.shape[1] >= 4:
-            labels = pointcloud[:, 3]
-        else:
-            labels = np.zeros(pointcloud.shape[0])
+        # Labels aus der 7. Spalte (Index 6) extrahieren
+        labels = pointcloud[:, 6]
         
         # Statistiken berechnen
         stats = {
