@@ -113,6 +113,7 @@ class Outdoor_base(Dataset):
                 data = np.load(file)
                 labels = data[:, 6].astype(int)
                 classes = np.unique(labels)
+                classes = [c for c in classes if c != 0]
                 print(
                     "{0} | shape: {1} | classes: {2}".format(
                         scan_name, data.shape, list(classes)
