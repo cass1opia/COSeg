@@ -119,6 +119,8 @@ class Outdoor_base(Dataset):
                     )
                 )
                 for class_id in classes:
+                    if class_id == 0:
+                        continue
                     # if the number of points for the target class is too few,
                     # do not add this sample into the dictionary
                     num_points = np.count_nonzero(labels == class_id)
