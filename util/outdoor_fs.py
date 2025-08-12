@@ -105,7 +105,7 @@ class Outdoor_base(Dataset):
             min_ratio = (
                 0 # to filter out scans with only rare labelled points
             )
-            min_pts = 50  # to filter out scans with only rare labelled points
+            min_pts = 0  # to filter out scans with only rare labelled points
             class2scans = {k: [] for k in range(self.class_count)}
             print("Data root: ", glob.glob(os.path.join(self.data_root, "*.npy")))
             for file in glob.glob(os.path.join(self.data_root, "*.npy")):
