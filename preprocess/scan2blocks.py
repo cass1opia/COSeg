@@ -25,6 +25,7 @@ def get_last_processed_scan(save_path):
         last_scan_name: Name of the last processed scan, or None if no files exist
     """
     data_dir = os.path.join(save_path, "data")
+    print(data_dir)
     if not os.path.exists(data_dir):
         return None
     
@@ -70,8 +71,8 @@ def filter_file_paths(file_paths, last_processed_scan):
         # If we can't find the last processed scan, return all files
         return file_paths
     
-    # Return files from the last processed scan onwards (including it)
-    return file_paths[last_scan_index:]
+    # Return files after the last processed scan (excluding it)
+    return file_paths[last_scan_index + 1:]
 
 
 def scan2blocks(data, block_size, stride, min_npts):
