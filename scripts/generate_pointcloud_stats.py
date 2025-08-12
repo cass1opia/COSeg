@@ -147,10 +147,11 @@ def main():
     parser.add_argument(
         "input_folder",
         help="Ordner mit .npy Punktwolken-Dateien",
+        default="/sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/processed"
     )
     parser.add_argument(
         "-o", "--output",
-        default="pointcloud_statistics.csv",
+        default="stats/pointcloud_statistics.csv",
         help="Ausgabe-CSV-Datei (Standard: pointcloud_statistics.csv)"
     )
     parser.add_argument(
