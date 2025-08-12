@@ -103,7 +103,7 @@ class Outdoor_base(Dataset):
         else:
             print("Class2scans.pkl does not exist, building it...")
             min_ratio = (
-                0.000001 # to filter out scans with only rare labelled points
+                0 # to filter out scans with only rare labelled points
             )
             min_pts = 50  # to filter out scans with only rare labelled points
             class2scans = {k: [] for k in range(self.class_count)}
