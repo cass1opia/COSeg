@@ -301,11 +301,9 @@ class Outdoor_FS(Outdoor_base):
         )  # to store the sampled scan names, in order to prevent sampling one scan several times...
         for sampled_class in sampled_classes:
             all_scannames = self.class2scans[sampled_class].copy()
-            all_scannames = [x for x in all_scannames if x not in black_list]
             selected_scannames = np.random.choice(
                 all_scannames, self.k_shot + self.n_queries, replace=False
             )
-            black_list.extend(selected_scannames)
             query_scannames = selected_scannames[: self.n_queries]
             support_scannames = selected_scannames[self.n_queries :]
 
@@ -385,11 +383,9 @@ class Outdoor_FS(Outdoor_base):
         )  # to store the sampled scan names, in order to prevent sampling one scan several times...
         for sampled_class in sampled_classes:
             all_scannames = self.class2scans[sampled_class].copy()
-            all_scannames = [x for x in all_scannames if x not in black_list]
             selected_scannames = np.random.choice(
                 all_scannames, self.k_shot + self.n_queries, replace=False
             )
-            black_list.extend(selected_scannames)
             query_scannames = selected_scannames[: self.n_queries]
             support_scannames = selected_scannames[self.n_queries :]
 
