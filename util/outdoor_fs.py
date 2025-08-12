@@ -301,6 +301,10 @@ class Outdoor_FS(Outdoor_base):
         )  # to store the sampled scan names, in order to prevent sampling one scan several times...
         for sampled_class in sampled_classes:
             all_scannames = self.class2scans[sampled_class].copy()
+            if(len(all_scannames) < self.k_shot + self.n_queries):
+                print(f"Warning: Not enough scans for class {sampled_class}. "
+                      f"Available: {len(all_scannames)}, Required: {self.k_shot + self.n_queries}")
+                continue
             selected_scannames = np.random.choice(
                 all_scannames, self.k_shot + self.n_queries, replace=False
             )
@@ -383,6 +387,10 @@ class Outdoor_FS(Outdoor_base):
         )  # to store the sampled scan names, in order to prevent sampling one scan several times...
         for sampled_class in sampled_classes:
             all_scannames = self.class2scans[sampled_class].copy()
+            if(len(all_scannames) < self.k_shot + self.n_queries):
+                print(f"Warning: Not enough scans for class {sampled_class}. "
+                      f"Available: {len(all_scannames)}, Required: {self.k_shot + self.n_queries}")
+                continue
             selected_scannames = np.random.choice(
                 all_scannames, self.k_shot + self.n_queries, replace=False
             )
