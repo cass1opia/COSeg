@@ -93,7 +93,7 @@ class Outdoor_base(Dataset):
         Build the class to scans mapping.
         """
         class2scans_file = os.path.join(
-            os.path.dirname(self.data_root), "class2scans.pkl"
+            os.path.dirname(os.path.dirname(self.data_root)), "class2scans.pkl"
         )
         print("Path to class2scans.pkl: ", class2scans_file)
 
