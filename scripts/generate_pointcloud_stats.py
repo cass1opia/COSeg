@@ -145,7 +145,7 @@ def main():
         description="Generiert Statistiken für Punktwolken aus .npy Dateien"
     )
     parser.add_argument(
-        "input_folder",
+        "--input_folder",
         help="Ordner mit .npy Punktwolken-Dateien",
         default="/sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/processed"
     )
