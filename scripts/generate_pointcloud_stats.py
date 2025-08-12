@@ -40,10 +40,14 @@ def analyze_pointcloud(file_path):
             logger.warning(f"Zu wenige Spalten in {file_path}: {pointcloud.shape[1]}")
             return None
             
-        # Koordinaten extrahieren (erste 3 Spalten)
-        coords = pointcloud[:, :3]
-        
+                
+        xyz = pointcloud[:, :3]
+        xyz_min = np.amin(xyz, axis=0)
+        xyz -= xyz_min
+        xyz_max = np.amax(xyz, axis=0)
         # Labels extrahieren (falls vorhanden, sonst alle 0)
+
+        print(xyz[:2,:])
         if pointcloud.shape[1] >= 4:
             labels = pointcloud[:, 3]
         else:
@@ -53,12 +57,12 @@ def analyze_pointcloud(file_path):
         stats = {
             'gesamtpunktanzahl': len(pointcloud),
             'streetsign_amount': np.sum(labels != 0),
-            'min_x': np.min(coords[:, 0]),
-            'max_x': np.max(coords[:, 0]),
-            'min_y': np.min(coords[:, 1]),
-            'max_y': np.max(coords[:, 1]),
-            'min_z': np.min(coords[:, 2]),
-            'max_z': np.max(coords[:, 2])
+            'min_x': xyz_min[0],
+            'max_x': xyz_max[0],
+            'min_y': xyz_min[1],
+            'max_y': xyz_max[1],
+            'min_z': xyz_min[2],
+            'max_z': xyz_max[2]
         }
         
         return stats
