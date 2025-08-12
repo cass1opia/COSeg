@@ -38,7 +38,7 @@ class Outdoor_base(Dataset):
         self.class_count = 14
         
         essen_classnames_path = os.path.join(
-            os.path.dirname(os.path.dirname(data_root)),
+           os.path.dirname(data_root),
             "meta",
             "essen_classnames.txt",
         )
