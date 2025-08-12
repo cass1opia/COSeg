@@ -105,7 +105,7 @@ class Outdoor_base(Dataset):
             min_ratio = (
                 0.05  # to filter out scans with only rare labelled points
             )
-            min_pts = 100  # to filter out scans with only rare labelled points
+            min_pts = 50  # to filter out scans with only rare labelled points
             class2scans = {k: [] for k in range(self.class_count)}
             print("Data root: ", glob.glob(os.path.join(self.data_root, "*.npy")))
             for file in glob.glob(os.path.join(self.data_root, "*.npy")):
@@ -125,7 +125,17 @@ class Outdoor_base(Dataset):
                     threshold = max(int(data.shape[0] * min_ratio), min_pts)
                     if num_points > threshold:
                         class2scans[class_id].append(scan_name)
-
+                # Save class2scans info to CSV
+                csv_file = os.path.join(os.path.dirname(self.data_root), "class2scans.csv")
+                
+                with open(csv_file, "w") as f:
+                    f.write("class_name,num_scans,scan_names\n")
+                    for class_id in range(self.class_count):
+                        class_name = self.class2type.get(class_id, f"class_{class_id}")
+                        scan_names = class2scans[class_id]
+                        f.write(f"{class_name},{len(scan_names)},{','.join(scan_names)}\n")
+                print("Class2scans.csv saved to", csv_file)
+                
             print("==== class to scans mapping is done ====")
             for class_id in range(self.class_count):
                 class_name = self.class2type.get(class_id, f"class_{class_id}")
