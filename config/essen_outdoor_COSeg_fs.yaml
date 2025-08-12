@@ -1,6 +1,6 @@
 DATA:
   data_name: outdoor
-  data_root: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/processed
+  data_root: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/processed/blocks_bs5.0_s5.0/data
   cache_dir: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/cache
   classes: 13
   class_ids: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
