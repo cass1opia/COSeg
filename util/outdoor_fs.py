@@ -103,7 +103,7 @@ class Outdoor_base(Dataset):
         else:
             print("Class2scans.pkl does not exist, building it...")
             min_ratio = (
-                0.05  # to filter out scans with only rare labelled points
+                0.000001 # to filter out scans with only rare labelled points
             )
             min_pts = 50  # to filter out scans with only rare labelled points
             class2scans = {k: [] for k in range(self.class_count)}
@@ -127,7 +127,7 @@ class Outdoor_base(Dataset):
                         class2scans[class_id].append(scan_name)
                 # Save class2scans info to CSV
                 csv_file = os.path.join(os.path.dirname(self.data_root), "class2scans.csv")
-                
+
                 with open(csv_file, "w") as f:
                     f.write("class_name,num_scans,scan_names\n")
                     for class_id in range(self.class_count):
@@ -148,7 +148,7 @@ class Outdoor_base(Dataset):
                         len(class2scans[class_id]),
                     )
                 )
-
+            
             with open(class2scans_file, "wb") as f:
                 pickle.dump(class2scans, f, pickle.HIGHEST_PROTOCOL)
             print("Class2scans.pkl built successfully and saved to ", class2scans_file)
@@ -311,13 +311,22 @@ class Outdoor_FS(Outdoor_base):
         )  # to store the sampled scan names, in order to prevent sampling one scan several times...
         for sampled_class in sampled_classes:
             all_scannames = self.class2scans[sampled_class].copy()
-            if(len(all_scannames) < self.k_shot + self.n_queries):
-                print(f"Warning: Not enough scans for class {sampled_class}. "
-                      f"Available: {len(all_scannames)}, Required: {self.k_shot + self.n_queries}")
+            if len(all_scannames) == 0:
+                print(f"Warning: No scans available for class {sampled_class}. Skipping this episode.")
                 continue
-            selected_scannames = np.random.choice(
-                all_scannames, self.k_shot + self.n_queries, replace=False
-            )
+            if len(all_scannames) < self.k_shot + self.n_queries:
+                print(f"Warning: Not enough scans for class {sampled_class}. "
+                      f"Available: {len(all_scannames)}, Required: {self.k_shot + self.n_queries}. "
+                      f"Duplicating available scans.")
+                # Duplicate available scans to meet the requirement
+                required_samples = self.k_shot + self.n_queries
+                selected_scannames = np.random.choice(
+                    all_scannames, required_samples, replace=True
+                )
+            else:
+                selected_scannames = np.random.choice(
+                    all_scannames, self.k_shot + self.n_queries, replace=False
+                )
             query_scannames = selected_scannames[: self.n_queries]
             support_scannames = selected_scannames[self.n_queries :]
 
