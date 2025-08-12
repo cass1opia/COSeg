@@ -107,7 +107,7 @@ class Outdoor_base(Dataset):
             )
             min_pts = 100  # to filter out scans with only rare labelled points
             class2scans = {k: [] for k in range(self.class_count)}
-
+            print("Data root: ", glob.glob(os.path.join(self.data_root, "*.npy")))
             for file in glob.glob(os.path.join(self.data_root, "*.npy")):
                 scan_name = os.path.basename(file)[:-4]
                 data = np.load(file)
