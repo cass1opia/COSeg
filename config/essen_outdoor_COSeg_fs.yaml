@@ -1,6 +1,6 @@
 DATA:
   data_name: outdoor
-  data_root: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/street-signs
+  data_root: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/street-signs/processed
   cache_dir: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/cache
   classes: 13
   class_ids: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
@@ -75,7 +75,7 @@ Few-shot:
   k_shot: 1
   n_queries: 1
   num_episode_per_comb: 1000
-  pretrain_backbone: /path/to/essen_outdoor/pretrained_backbone_weights/model_backbone
+  pretrain_backbone: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/S3DIS/pretrained_backbone_weights/s3_s1pre_1/s3_s1pre
   n_subprototypes: 100
   vis: 0
   forvis: 0

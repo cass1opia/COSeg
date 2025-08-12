@@ -45,7 +45,6 @@ def analyze_pointcloud(file_path):
         xyz_min = np.amin(xyz, axis=0)
         xyz -= xyz_min
 
-        print(np.amin(xyz, axis=0))
         # Labels aus der 7. Spalte (Index 6) extrahieren
         labels = pointcloud[:, 6]
         
