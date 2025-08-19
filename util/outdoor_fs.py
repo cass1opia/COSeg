@@ -725,11 +725,6 @@ class Outdoor_FS_TEST(Dataset):
                     self.file_names.append(out_filename)
                     episode_ind += 1
 
-
-            with open(os.path.join(os.path.join(self.data_root, "stats"), "class_combination_2_episodes.csv"), "w") as f:
-                f.write("class_combination,num_episodes\n")
-                for class_combination in class_comb:
-                    f.write(f"{class_combination},{self.num_episode_per_comb}\n")
             
 
     def __len__(self):
