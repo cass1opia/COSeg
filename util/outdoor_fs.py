@@ -94,30 +94,23 @@ class Outdoor_base(Dataset):
         class2scans_file = os.path.join(
             os.path.dirname(self.data_root), "class2scans.pkl"
         )
-        print("Path to class2scans.pkl: ", class2scans_file)
 
         if os.path.exists(class2scans_file):
             with open(class2scans_file, "rb") as f:
                 class2scans = pickle.load(f)
         else:
-            print("Class2scans.pkl does not exist, building it...")
             min_ratio = (
                 0 # to filter out scans with only rare labelled points
             )
             min_pts = 0  # to filter out scans with only rare labelled points
             class2scans = {k: [] for k in self.class2type.keys()}
-            print("Data root: ", glob.glob(os.path.join(self.data_root, "*.npy")))
             for file in glob.glob(os.path.join(self.data_root, "*.npy")):
                 scan_name = os.path.basename(file)[:-4]
                 data = np.load(file)
                 labels = data[:, 6].astype(int)
                 classes = np.unique(labels)
                 classes = [c for c in classes]
-                print(
-                    "{0} | shape: {1} | classes: {2}".format(
-                        scan_name, data.shape, list(classes)
-                    )
-                )
+             
                 for class_id in classes:
                     num_points = np.count_nonzero(labels == class_id)
                     threshold = max(int(data.shape[0] * min_ratio), min_pts)
@@ -133,20 +126,6 @@ class Outdoor_base(Dataset):
                         class_name = self.class2type.get(class_id, f"class_{class_id}")
                         scan_names = class2scans[class_id]
                         f.write(f"{class_name},{len(scan_names)},{','.join(scan_names)}\n")
-                print("Class2scans.csv saved to", csv_file)
-                
-            print("==== class to scans mapping is done ====")
-            for class_id in self.class2type.keys():
-                class_name = self.class2type.get(class_id, f"class_{class_id}")
-                print(
-                    "\t class_id: {0} | min_ratio: {1} | min_pts: {2} | class_name: {3} | num of scans: {4}".format(
-                        class_id,
-                        min_ratio,
-                        min_pts,
-                        class_name,
-                        len(class2scans[class_id]),
-                    )
-                )
             
             with open(class2scans_file, "wb") as f:
                 pickle.dump(class2scans, f, pickle.HIGHEST_PROTOCOL)
