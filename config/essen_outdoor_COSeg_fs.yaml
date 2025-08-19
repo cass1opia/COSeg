@@ -73,7 +73,7 @@ Few-shot:
   n_way: 1
   k_shot: 5
   n_queries: 1
-  num_episode_per_comb: 1000
+  num_episode_per_comb: 100
   pretrain_backbone: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/S3DIS/pretrained_backbone_weights/s3_s1pre_1/s3_s1pre
   n_subprototypes: 100
   vis: 0
