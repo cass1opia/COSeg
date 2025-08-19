@@ -126,12 +126,12 @@ class Outdoor_base(Dataset):
                             class2scans[class_id].append(scan_name)
                         else:
                             print(f"Class {class_id} not found in class2scans mapping")
-                            
+
                 csv_file = os.path.join(os.path.dirname(self.data_root), "class2scans.csv")
 
                 with open(csv_file, "w") as f:
                     f.write("class_name,num_scans,scan_names\n")
-                    for class_id in range(self.class_count):
+                    for class_id in self.class2type.keys():
                         class_name = self.class2type.get(class_id, f"class_{class_id}")
                         scan_names = class2scans[class_id]
                         f.write(f"{class_name},{len(scan_names)},{','.join(scan_names)}\n")
