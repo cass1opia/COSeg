@@ -2,6 +2,7 @@ DATA:
   data_name: outdoor
   data_root: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/processed/blocks_bs5.0_s5.0/data
   cache_dir: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/cache
+  classes: 13
   fea_dim: 6
   voxel_size: 0.02
   voxel_max: 20480
