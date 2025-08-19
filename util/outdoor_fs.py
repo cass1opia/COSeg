@@ -138,7 +138,7 @@ class Outdoor_base(Dataset):
                 print("Class2scans.csv saved to", csv_file)
                 
             print("==== class to scans mapping is done ====")
-            for class_id in range(self.class_count):
+            for class_id in self.class2type.keys():
                 class_name = self.class2type.get(class_id, f"class_{class_id}")
                 print(
                     "\t class_id: {0} | min_ratio: {1} | min_pts: {2} | class_name: {3} | num of scans: {4}".format(
