@@ -47,13 +47,12 @@ class Outdoor_base(Dataset):
         class_names = open(essen_classnames_path).readlines()
 
         self.class2type = {
-            i: name.strip() for i, name in enumerate(class_names) if name.strip()
+            i+1: name.strip() for i, name in enumerate(class_names) if name.strip()
         }
         print(self.class2type)
         self.type2class = {self.class2type[t]: t for t in self.class2type}
         
         # Define cross-validation folds for outdoor traffic signs
-        # Fold 0: Basic traffic signs
         self.fold_0 = [
             "TrafficSign",
             "StreetSign", 
@@ -63,7 +62,7 @@ class Outdoor_base(Dataset):
             "TriangularTrafficSign",
             "FlippedTriangularTrafficSign"
         ]
-        # Fold 1: Specialized signs and markers
+
         self.fold_1 = [
             "DirectionSign",
             "PriorityRoad",
@@ -81,7 +80,7 @@ class Outdoor_base(Dataset):
             raise NotImplementedError(
                 "Unknown cvfold (%s). [Options: 0,1]" % cvfold
             )
-        all_classes = [i for i in range(0, self.class_count - 1)]
+        all_classes = self.class2type.keys()
         self.train_classes = [
             c for c in all_classes if c not in self.test_classes
         ]
@@ -106,29 +105,28 @@ class Outdoor_base(Dataset):
                 0 # to filter out scans with only rare labelled points
             )
             min_pts = 0  # to filter out scans with only rare labelled points
-            class2scans = {k: [] for k in range(self.class_count)}
+            class2scans = {k: [] for k in self.class2type.keys()}
             print("Data root: ", glob.glob(os.path.join(self.data_root, "*.npy")))
             for file in glob.glob(os.path.join(self.data_root, "*.npy")):
                 scan_name = os.path.basename(file)[:-4]
                 data = np.load(file)
                 labels = data[:, 6].astype(int)
                 classes = np.unique(labels)
-                classes = [c for c in classes if c != 0]
+                classes = [c for c in classes]
                 print(
                     "{0} | shape: {1} | classes: {2}".format(
                         scan_name, data.shape, list(classes)
                     )
                 )
                 for class_id in classes:
-                    if class_id == 0:
-                        continue
-                    # if the number of points for the target class is too few,
-                    # do not add this sample into the dictionary
                     num_points = np.count_nonzero(labels == class_id)
                     threshold = max(int(data.shape[0] * min_ratio), min_pts)
                     if num_points > threshold:
-                        class2scans[class_id].append(scan_name)
-                # Save class2scans info to CSV
+                        if class_id in class2scans.keys():
+                            class2scans[class_id].append(scan_name)
+                        else:
+                            print(f"Class {class_id} not found in class2scans mapping")
+                            
                 csv_file = os.path.join(os.path.dirname(self.data_root), "class2scans.csv")
 
                 with open(csv_file, "w") as f:
