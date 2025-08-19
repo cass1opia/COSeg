@@ -1,0 +1,21 @@
+save_path: "/sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/processed/stats/"
+pretrain_backbone: "/sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/S3DIS/pretrained_backbone_weights/s3_s1pre_1/s3_s1pre"
+weight: "/sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/S3DIS/pretrained_weights/model/model_best.pth"
+data_root: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/processed/blocks_bs5.0_s5.0/data
+
+gpu_ids: [0, 1, 2, 3]
+workers: 16
+dist_backend: 'nccl'
+
+eval_split: test
+cvfold: 0
+
+
+num_episode: 400
+n_way: 1
+k_shot: 5
+n_queries: 1
+num_episode_per_comb: 100
+
+voxel_size: 0.02
+voxel_max: 20480
