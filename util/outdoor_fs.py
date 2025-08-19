@@ -55,16 +55,16 @@ class Outdoor_base(Dataset):
         # Define cross-validation folds for outdoor traffic signs
         self.fold_0 = [
             "TrafficSign",
-            "StreetSign", 
             "CircularTrafficSign",
             "OctagonalTrafficSign",
             "RectangularTrafficSign",
             "TriangularTrafficSign",
-            "FlippedTriangularTrafficSign"
+            "DirectionSign"
         ]
 
         self.fold_1 = [
-            "DirectionSign",
+            "StreetSign", 
+            "FlippedTriangularTrafficSign",
             "PriorityRoad",
             "OneWayStreet", 
             "Zone",
@@ -124,8 +124,6 @@ class Outdoor_base(Dataset):
                     if num_points > threshold:
                         if class_id in class2scans.keys():
                             class2scans[class_id].append(scan_name)
-                        else:
-                            print(f"Class {class_id} not found in class2scans mapping")
 
                 csv_file = os.path.join(os.path.dirname(self.data_root), "class2scans.csv")
 
