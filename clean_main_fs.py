@@ -15,7 +15,7 @@ from util.data_util import collate_fn_limit_fs
 from util.outdoor_fs import Outdoor_FS_TEST
 
 def main_process():
-    return args.rank % args.ngpus_per_node == 0
+    return args["rank"] % args["ngpus_per_node"] == 0
 def find_free_port():
     import socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
