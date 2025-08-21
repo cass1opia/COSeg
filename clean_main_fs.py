@@ -13,6 +13,7 @@ from util import logger
 from util.common_util import AverageMeter, evaluate_metric, load_pretrain_checkpoint
 from util.data_util import collate_fn_limit_fs
 from util.outdoor_fs import Outdoor_FS_TEST
+from dotmap import DotMap
 
 def main_process():
     return args["rank"] % args["ngpus_per_node"] == 0
@@ -26,7 +27,7 @@ def find_free_port():
 
 def get_args(path_to_config):
     with open(path_to_config, "r") as f:
-        return yaml.safe_load(f)
+        return DotMap(yaml.safe_load(f))
 
 def main():
     args = get_args("config/example.yaml")
