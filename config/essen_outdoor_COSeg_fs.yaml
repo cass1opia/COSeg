@@ -82,7 +82,7 @@ Few-shot:
   target_class: 1
 
 Distributed:
-  dist_url: tcp://127.0.0.1:6789
+  dist_url: 
   dist_backend: 'nccl'
   multiprocessing_distributed: True
   world_size: 1
