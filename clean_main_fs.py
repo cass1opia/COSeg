@@ -76,8 +76,17 @@ def main_worker(gpu, nprocs, args_local, dist_url):
 
     model = load_pretrain_checkpoint(model, args["pretrain_backbone"], gpu)
 
-    checkpoint = torch.load(args["weight"])
+    checkpoint = torch.load(args["weight"], map_location=f"cuda:{gpu}")
     pretrained_dict = checkpoint["state_dict"]
+    
+    if not isinstance(
+                model, torch.nn.parallel.DistributedDataParallel
+            ):
+                pretrained_dict = {
+                    k.replace("module.", ""): v
+                    for k, v in pretrained_dict.items()
+                }
+
     model.load_state_dict(pretrained_dict)
 
     val_data = Outdoor_FS_TEST(
