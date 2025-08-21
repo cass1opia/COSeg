@@ -41,7 +41,9 @@ def main():
         join=True,
     )
 
-def main_worker(gpu, nprocs, args, dist_url):
+def main_worker(gpu, nprocs, args_local, dist_url):
+    global args
+    args = args_local
     if main_process(args):
         global logger
         logger = logger.get_logger(args.save_path)
