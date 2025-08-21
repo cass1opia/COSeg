@@ -3,7 +3,7 @@ import os
 import time
 
 import yaml
-from main_fs import validate
+from main_fs import get_parser, validate
 from model.coseg import COSeg
 import torch 
 import torch.multiprocessing as mp
@@ -30,7 +30,7 @@ def get_args(path_to_config):
         return DotMap(yaml.safe_load(f))
 
 def main():
-    args = get_args("config/example.yaml")
+    args = get_parser()
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(str(x) for x in args["gpu_ids"])
     port = find_free_port()
     dist_url = f"tcp://127.0.0.1:{port}"
