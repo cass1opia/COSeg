@@ -49,7 +49,7 @@ def main_worker(gpu, nprocs, args_local, dist_url):
     print(args)
     if main_process():
         global logger
-        logger = logger.get_logger(args.save_path)
+        logger = logger.get_logger(args["save_path"])
 
     torch.cuda.set_device(gpu)
 
@@ -62,9 +62,9 @@ def main_worker(gpu, nprocs, args_local, dist_url):
         
     model = COSeg(args)
 
-    args.workers = int((args.workers + nprocs - 1) / nprocs)
+    args["workers"] = int((args["workers"] + nprocs - 1) / nprocs)
     
-    if args.sync_bn:
+    if args["sync_bn"]:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
     model = model.cuda()
@@ -73,24 +73,24 @@ def main_worker(gpu, nprocs, args_local, dist_url):
             model, device_ids=[gpu], find_unused_parameters=True
     )
 
-    model = load_pretrain_checkpoint(model, args.pretrain_backbone, gpu)
+    model = load_pretrain_checkpoint(model, args["pretrain_backbone"], gpu)
 
-    checkpoint = torch.load(args.weight)
+    checkpoint = torch.load(args["weight"])
     pretrained_dict = checkpoint["state_dict"]
     model.load_state_dict(pretrained_dict)
 
     val_data = Outdoor_FS_TEST(
-                split=args.eval_split,
-                data_root=args.data_root,
-                voxel_size=args.voxel_size,
-                voxel_max=args.voxel_max,
+                split=args["eval_split"],
+                data_root=args["data_root"],
+                voxel_size=args["voxel_size"],
+                voxel_max=args["voxel_max"],
                 transform=None,
-                cvfold=args.cvfold,
-                num_episode=args.num_episode,
-                n_way=args.n_way,
-                k_shot=args.k_shot,
-                n_queries=args.n_queries,
-                num_episode_per_comb=args.num_episode_per_comb,
+                cvfold=args["cvfold"],
+                num_episode=args["num_episode"],
+                n_way=args["n_way"],
+                k_shot=args["k_shot"],
+                n_queries=args["n_queries"],
+                num_episode_per_comb=args["num_episode_per_comb"],
             )
     if main_process():
         val_data.prepare_test_data()
@@ -104,17 +104,17 @@ def main_worker(gpu, nprocs, args_local, dist_url):
         val_data,
         batch_size=1,
         shuffle=False,
-        num_workers=args.workers,
+        num_workers=args["workers"],
         pin_memory=True,
         sampler=val_sampler,
         collate_fn=partial(
-            collate_fn_limit_fs, include_scene_names=args.forvis
+            collate_fn_limit_fs, include_scene_names=args["forvis"]
         ),
     )
 
-    validate(val_loader, model, list(val_data.classes), args)
+    validate(val_loader, model, list(val_data.classes))
 
-def validate(val_loader, model, valid_classes, args):
+def validate(val_loader, model, valid_classes):
     if main_process():
         logger.info(">>>>>>>>>>>>>>>> Start Evaluation >>>>>>>>>>>>>>>>")
     batch_time = AverageMeter()
@@ -164,7 +164,7 @@ def validate(val_loader, model, valid_classes, args):
         loss /= n
 
         intersection, union, target = evaluate_metric(
-            output, query_y, sampled_classes, valid_classes, args.ignore_label
+            output, query_y, sampled_classes, valid_classes, args["ignore_label"]
         )
 
         dist.all_reduce(intersection), dist.all_reduce(
@@ -187,7 +187,7 @@ def validate(val_loader, model, valid_classes, args):
         loss_meter.update(loss.item(), n)
         batch_time.update(time.time() - end)
         end = time.time()
-        if (i + 1) % args.print_freq == 0 and main_process():
+        if (i + 1) % args["print_freq"] == 0 and main_process():
             logger.info(
                 "Test: [{}/{}] "
                 "Data {data_time.val:.3f} ({data_time.avg:.3f}) "
@@ -222,7 +222,7 @@ def validate(val_loader, model, valid_classes, args):
             )
         logger.info("<<<<<<<<<<<<<<<<< End Evaluation <<<<<<<<<<<<<<<<<")
 
-    with open(os.path.join(args.save_path, "results.csv"), "w") as f:
+    with open(os.path.join(args["save_path"], "results.csv"), "w") as f:
         f.write("class,iou,accuracy\n")
         for i in range(len(valid_classes)):
             f.write(f"{valid_classes[i]},{iou_class[i]},{accuracy_class[i]}\n")
