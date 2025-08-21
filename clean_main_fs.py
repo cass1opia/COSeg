@@ -78,8 +78,16 @@ def main_worker(gpu, nprocs, args_local, dist_url):
 
     checkpoint = torch.load(args["weight"], map_location=f"cuda:{gpu}")
     pretrained_dict = checkpoint.get("state_dict", checkpoint)
-    print(checkpoint.keys())
-    print(pretrained_dict.keys())
+    
+    print("Expected model keys:")
+    for k in model.state_dict().keys():
+        print(f"  {k}")
+    print("\nCheckpoint keys:")
+    for k in checkpoint.keys():
+        print(f"  {k}")
+    print("\nPretrained dict keys:")
+    for k in pretrained_dict.keys():
+        print(f"  {k}")
 
     if not isinstance(
                 model, torch.nn.parallel.DistributedDataParallel
