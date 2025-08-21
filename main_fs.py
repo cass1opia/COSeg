@@ -50,12 +50,12 @@ def get_parser():
     parser.add_argument(
         "--config",
         type=str,
-        default="config/s3dis_COSeg_fs.yaml",
+        default="config/essen_outdoor_COSeg_fs.yaml",
         help="config file",
     )
     parser.add_argument(
         "opts",
-        help="see config/s3dis_COSeg_fs.yaml for all options",
+        help="see config/essen_outdoor_COSeg_fs.yaml for all options",
         default=None,
         nargs=argparse.REMAINDER,
     )
