@@ -14,7 +14,7 @@ from util.common_util import AverageMeter, evaluate_metric, load_pretrain_checkp
 from util.data_util import collate_fn_limit_fs
 from util.outdoor_fs import Outdoor_FS_TEST
 
-def main_process(args):
+def main_process():
     return args.rank % args.ngpus_per_node == 0
 def find_free_port():
     import socket
@@ -44,7 +44,7 @@ def main():
 def main_worker(gpu, nprocs, args_local, dist_url):
     global args
     args = args_local
-    if main_process(args):
+    if main_process():
         global logger
         logger = logger.get_logger(args.save_path)
 
@@ -56,7 +56,7 @@ def main_worker(gpu, nprocs, args_local, dist_url):
         world_size=nprocs,
         rank=gpu,
     )
-
+    args.rank = gpu
         
     model = COSeg(args)
 
@@ -90,7 +90,7 @@ def main_worker(gpu, nprocs, args_local, dist_url):
                 n_queries=args.n_queries,
                 num_episode_per_comb=args.num_episode_per_comb,
             )
-    if main_process(args):
+    if main_process():
         val_data.prepare_test_data()
 
     dist.barrier()
