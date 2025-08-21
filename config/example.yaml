@@ -2,6 +2,7 @@ save_path: "/sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road
 pretrain_backbone: "/sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/S3DIS/pretrained_backbone_weights/s3_s1pre_1/s3_s1pre"
 weight: "/sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/S3DIS/pretrained_weights/model/model_best.pth"
 data_root: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/processed/blocks_bs5.0_s5.0/data
+cache_dir: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/cache
 
 gpu_ids: [0, 1, 2, 3]
 workers: 16
