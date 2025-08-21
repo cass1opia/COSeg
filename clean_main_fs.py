@@ -46,6 +46,7 @@ def main_worker(gpu, nprocs, args_local, dist_url):
     args = args_local
     args["rank"] = gpu
     args["ngpus_per_node"] = nprocs
+    print(args)
     if main_process():
         global logger
         logger = logger.get_logger(args.save_path)
