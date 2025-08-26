@@ -64,7 +64,7 @@ class COSeg(nn.Module):
                     9: 6,
                 }
         elif args.data_name == "outdoor":
-            self.base_classes = 7
+            self.base_classes = 6
             if args.cvfold == 0:
                 # Fold 0: Basic traffic signs are test classes
                 # Base classes: Specialized signs and markers
@@ -175,7 +175,7 @@ class COSeg(nn.Module):
         if self.args.data_name == "s3dis":
             agglayers = 2
         elif self.args.data_name == "outdoor":
-            agglayers = 3
+            agglayers = 2
         else:
             agglayers = 4
 
