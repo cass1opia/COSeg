@@ -98,3 +98,5 @@ data/
 logs
 val.py
 stats/*
+
+events.*
