@@ -11,12 +11,40 @@ dist_backend: 'nccl'
 eval_split: test
 cvfold: 0
 
-
-num_episode: 400
 n_way: 1
 k_shot: 5
+n_subprototypes: 100 #
 n_queries: 1
+
+ignore_label: 255 # 
+grid_size: 0.04 #
+patch_size: 1 #
+window_size: 4 #
+num_layers: 4 #
+quant_size: 0.01 #
+
+# Encoder
+downsample_scale: 8 #
+depths: [2, 2, 6, 2] #
+channels: [48, 96, 192, 384] #
+num_heads: [3, 6, 12, 24] #
+up_k: 3 #
+rel_query: True #
+rel_key: True #
+rel_value: True #
+drop_path_rate: 0.3 #
+concat_xyz: True #
+classes: 13 #
+ratio: 0.25 #
+k: 16
+num_layers: 4
+stem_transformer: True
+fea_dim: 6
+
+num_episode: 400
 num_episode_per_comb: 100
 
 voxel_size: 0.02
 voxel_max: 20480
+loop: 1
+arch: stratified_transformer
