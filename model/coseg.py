@@ -63,30 +63,53 @@ class COSeg(nn.Module):
                     7: 5,
                     9: 6,
                 }
+                
         elif args.data_name == "outdoor":
             self.base_classes = 6
+            # if args.cvfold == 0:
+            #     # Fold 0: Basic traffic signs are test classes
+            #     # Base classes: Specialized signs and markers
+            #     self.base_class_to_pred_label = {
+            #         7: 1,   # DirectionSign
+            #         9: 2,   # PriorityRoad
+            #         10: 3,  # OneWayStreet
+            #         11: 4,  # Zone
+            #         12: 5,  # Exit
+            #         13: 6,  # DistanceMarker
+            #     }
+            # else:  # cvfold == 1
+            #     # Fold 1: Specialized signs are test classes
+            #     # Base classes: Basic traffic signs
+            #     self.base_class_to_pred_label = {
+            #         1: 1,   # TrafficSign
+            #         2: 2,   # StreetSign
+            #         3: 3,   # CircularTrafficSign
+            #         4: 4,   # OctagonalTrafficSign
+            #         5: 5,   # RectangularTrafficSign
+            #         6: 6,   # TriangularTrafficSign
+            #         8: 7,   # FlippedTriangularTrafficSign
+            #     }
             if args.cvfold == 0:
+                self.base_classes = 5 # 5
                 # Fold 0: Basic traffic signs are test classes
                 # Base classes: Specialized signs and markers
                 self.base_class_to_pred_label = {
-                    7: 1,   # DirectionSign
-                    9: 2,   # PriorityRoad
-                    10: 3,  # OneWayStreet
+                    1: 1,   # StreetSign
+                    8: 2,   # FlippedTriangularTrafficSign
+                    9: 3,   # PriorityRoad
                     11: 4,  # Zone
-                    12: 5,  # Exit
-                    13: 6,  # DistanceMarker
+                    13: 5,  # DistanceMarker
                 }
             else:  # cvfold == 1
+                self.base_classes = 5 # 5
                 # Fold 1: Specialized signs are test classes
                 # Base classes: Basic traffic signs
                 self.base_class_to_pred_label = {
-                    1: 1,   # TrafficSign
-                    2: 2,   # StreetSign
-                    3: 3,   # CircularTrafficSign
-                    4: 4,   # OctagonalTrafficSign
-                    5: 5,   # RectangularTrafficSign
-                    6: 6,   # TriangularTrafficSign
-                    8: 7,   # FlippedTriangularTrafficSign
+                    3: 1,   # CircularTrafficSign
+                    4: 2,   # OctagonalTrafficSign
+                    5: 3,   # RectangularTrafficSign
+                    6: 4,   # TriangularTrafficSign
+                    7: 5,   # DirectionSign
                 }
         else:
             self.base_classes = 10
@@ -148,6 +171,9 @@ class COSeg(nn.Module):
         self.feat_dim = args.channels[2]
 
         self.visualization = args.vis
+        self.vis_freq = getattr(args, 'vis_freq', 1)  # Jede N-te Episode visualisieren
+        self.vis_start_episode = getattr(args, 'vis_start_episode', 0)  # Ab welcher Episode starten
+        self.episode_counter = 0  # Zähler für Episoden
 
         self.lin1 = nn.Sequential(
             nn.Linear(self.n_subprototypes, self.feat_dim),
@@ -465,17 +491,67 @@ class COSeg(nn.Module):
             .unsqueeze(0)
         )  # 1, n_way+1, N_query
 
-        # wandb visualization
+        # wandb visualization - nur bei bestimmten Episoden
         if self.visualization:
-            self.vis(
-                query_offset,
-                query_x,
-                query_y,
-                support_offset,
-                support_x,
-                support_y,
-                final_pred,
+            # Prüfe ob diese Episode visualisiert werden soll
+            should_visualize = (
+                self.episode_counter >= self.vis_start_episode and 
+                (self.episode_counter - self.vis_start_episode) % self.vis_freq == 0
             )
+            
+            if should_visualize:
+                # Konvertiere alle sampled_classes zu Klassennamen für wandb Labels
+                target_class_names = []
+                if sampled_classes is not None and len(sampled_classes) > 0:
+                    # Mapping von Klassen-ID zu Klassennamen für Outdoor-Dataset
+                    CLASS_ID_TO_NAME = {
+                        1: "StreetSign",
+                        3: "CircularTrafficSign", 
+                        4: "OctagonalTrafficSign",
+                        5: "RectangularTrafficSign",
+                        6: "TriangularTrafficSign",
+                        7: "DirectionSign",
+                        8: "FlippedTriangularTrafficSign",
+                        9: "PriorityRoad",
+                        11: "Zone",
+                        13: "DistanceMarker",
+                    }
+                    # Konvertiere alle Klassen in der Episode
+                    for class_id in sampled_classes:
+                        class_name = CLASS_ID_TO_NAME.get(class_id, f"Class_{class_id}")
+                        target_class_names.append(class_name)
+                
+                # Erstelle einen kombinierten Namen für alle Klassen
+                if target_class_names:
+                    combined_class_name = "_".join(target_class_names)
+                else:
+                    combined_class_name = None
+                
+                self.vis(
+                    query_offset,
+                    query_x,
+                    query_y,
+                    support_offset,
+                    support_x,
+                    support_y,
+                    final_pred,
+                    combined_class_name,
+                )
+                
+                # Logge zusätzliche Klasseninformationen für diese Episode
+                if self.main_process():
+                    self.logger.info(f"Episode {self.episode_counter}: Klassen {target_class_names} (IDs: {sampled_classes.tolist()})")
+                    
+                    # Logge Klasseninformationen als wandb Metriken
+                    wandb.log({
+                        "episode/classes": combined_class_name,
+                        "episode/class_ids": sampled_classes.tolist(),
+                        "episode/counter": self.episode_counter,
+                        "episode/num_classes": len(target_class_names)
+                    }, commit=False)
+            
+            # Episode-Zähler erhöhen
+            self.episode_counter += 1
 
         return final_pred, loss
 
@@ -639,6 +715,7 @@ class COSeg(nn.Module):
         support_x,
         support_y,
         final_pred,
+        target_class_name=None,
     ):
         query_offset_cpu = query_offset[:-1].long().cpu()
         query_x_splits = torch.tensor_split(query_x, query_offset_cpu)
@@ -701,8 +778,48 @@ class COSeg(nn.Module):
             qu_gts.append(qu_gt)
             qu_pds.append(q_prd)
 
-        wandb.log(
-            {
+        # Erstelle Labels für wandb basierend auf target_class_name
+        if target_class_name:
+            # Erstelle separate Media-Kategorien für jede Klasse
+            wandb_labels = {}
+            
+            # Support Daten mit Klassennamen als Kategorie
+            wandb_labels[f"Support_{target_class_name}"] = [
+                wandb.Object3D(sp_nps[i], caption=f"Support_{target_class_name}_{i}") 
+                for i in range(len(sp_nps))
+            ]
+            
+            # Support_fg Daten mit Klassennamen als Kategorie
+            wandb_labels[f"Support_fg_{target_class_name}"] = [
+                wandb.Object3D(sp_fgs[i], caption=f"Support_fg_{target_class_name}_{i}") 
+                for i in range(len(sp_fgs))
+            ]
+            
+            # Query Daten mit Klassennamen als Kategorie
+            wandb_labels[f"Query_{target_class_name}"] = [
+                wandb.Object3D(qu_s[i], caption=f"Query_{target_class_name}_{i}") 
+                for i in range(len(qu_s))
+            ]
+            
+            # Query_pred Daten mit Klassennamen als Kategorie
+            wandb_labels[f"Query_pred_{target_class_name}"] = [
+                wandb.Object3D(qu_pds[i], caption=f"Query_pred_{target_class_name}_{i}") 
+                for i in range(len(qu_pds))
+            ]
+            
+            # Query_GT Daten mit Klassennamen als Kategorie
+            wandb_labels[f"Query_GT_{target_class_name}"] = [
+                wandb.Object3D(qu_gts[i], caption=f"Query_GT_{target_class_name}_{i}") 
+                for i in range(len(qu_gts))
+            ]
+            
+            # Zusätzliche Metadaten für bessere Nachverfolgung
+            wandb_labels["Episode_Classes"] = target_class_name
+            wandb_labels["Num_Support_Scenes"] = len(sp_nps)
+            wandb_labels["Num_Query_Scenes"] = len(qu_s)
+        else:
+            # Fallback für den Fall, dass kein target_class_name angegeben ist
+            wandb_labels = {
                 "Support": [
                     wandb.Object3D(sp_nps[i]) for i in range(len(sp_nps))
                 ],
@@ -717,4 +834,22 @@ class COSeg(nn.Module):
                     wandb.Object3D(qu_gts[i]) for i in range(len(qu_gts))
                 ],
             }
-        )
+
+        wandb.log(wandb_labels, commit=self.training)
+        
+        # Zusätzliches Logging der Klassen als separate Metriken und Media-Kategorien
+        if target_class_name:
+            # Logge die Klasseninformationen als separate Metriken
+            wandb.log({
+                "visualization/episode_classes": target_class_name,
+                "visualization/num_support_scenes": len(sp_nps),
+                "visualization/num_query_scenes": len(qu_s),
+                "visualization/episode_counter": self.episode_counter
+            }, commit=False)
+            
+            # Erstelle separate wandb-Logs für jede Media-Kategorie mit Klassennamen
+            # Dies sorgt dafür, dass die Klassen in der Media-Sektion als separate Kategorien erscheinen
+            for media_type in ["Support", "Support_fg", "Query", "Query_pred", "Query_GT"]:
+                media_key = f"{media_type}_{target_class_name}"
+                if media_key in wandb_labels:
+                    wandb.log({media_key: wandb_labels[media_key]}, commit=False)

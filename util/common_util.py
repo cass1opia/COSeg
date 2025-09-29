@@ -20,16 +20,21 @@ def evaluate_metric(pred_label, gt_label, label2class, test_classes, ignore_inde
     :param test_classes: the original id of all test classes
     :return: _description_
     """
-
+    
     NUM_CLASS = len(test_classes)
-    test_classes = {c:i for i, c in enumerate(test_classes)}
+    # Mappe Original-Class-IDs -> Metrik-Index; ignoriere fehlende Zuordnungen später robust
+    test_class_to_index = {c: i for i, c in enumerate(test_classes)}    
 
     union_classes = torch.tensor([0 for _ in range(NUM_CLASS)], device='cuda')
     intersec_classes = torch.tensor([0 for _ in range(NUM_CLASS)], device='cuda')
     target_classes = torch.tensor([0 for _ in range(NUM_CLASS)], device='cuda')
     intersection, union, target = intersectionAndUnionGPU(pred_label, gt_label, len(label2class)+1, ignore_index)
     for i in range(1, len(intersection)):
-        class_idx = test_classes[label2class[i-1]]
+        original_class_id = label2class[i - 1]
+        if original_class_id not in test_class_to_index:
+            # Episode-Klasse nicht im gewählten Test-Klassenset: überspringen
+            continue
+        class_idx = test_class_to_index[original_class_id]
         intersec_classes[class_idx] += intersection[i]
         union_classes[class_idx] += union[i]
         target_classes[class_idx] += target[i]
@@ -42,6 +47,7 @@ def load_pretrain_checkpoint(model, pretrain_checkpoint_path, gpu):
     model_dict = model.state_dict()
     if pretrain_checkpoint_path is not None:
         print('Load encoder module from pretrained checkpoint...')
+        print(gpu)
         if isinstance(gpu, list):
             assert len(gpu) == 1
             gpu = gpu[0]

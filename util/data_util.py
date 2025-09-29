@@ -32,6 +32,30 @@ def collate_fn_limit_fs(batch, include_scene_names=False):
             sampled_classes,
         ) = batch[0]
 
+    # Check if lists are empty and handle gracefully
+    if len(support_feat) == 0 or len(query_feat) == 0:
+        print(f"Warning: Empty support_feat ({len(support_feat)}) or query_feat ({len(query_feat)}) lists. "
+              f"Sampled classes: {sampled_classes}")
+        # Return dummy tensors to prevent crashes
+        dummy_tensor = torch.zeros((1, 6), dtype=torch.float32)  # 3 coord + 3 feat
+        dummy_label = torch.zeros((1,), dtype=torch.long)
+        dummy_offset = torch.IntTensor([1])
+        
+        return_tuple = (
+            dummy_tensor,
+            dummy_label,
+            dummy_offset,
+            dummy_tensor,
+            dummy_label,
+            dummy_offset,
+            sampled_classes,
+        )
+        
+        if include_scene_names:
+            return_tuple += (scene_names if 'scene_names' in locals() else [],)
+            
+        return return_tuple
+
     # Compute support offset
     support_offset, count = [], 0
     for item in support_feat:

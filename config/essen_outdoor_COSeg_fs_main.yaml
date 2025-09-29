@@ -3,7 +3,7 @@ DATA:
   save_path: "/sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/processed/stats/"
   data_root: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/processed/blocks_bs5.0_s5.0/data
   cache_dir: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/cache
-  classes: 10
+  classes: 12
   fea_dim: 6
   voxel_size: 0.02
   voxel_max: 20480
@@ -11,7 +11,7 @@ DATA:
   cvfold: 1
 
 TRAIN:
-  #arch
+  #archπs
   arch: stratified_transformer
   stem_transformer: True
   use_xyz: True
@@ -49,7 +49,7 @@ TRAIN:
   use_amp: True
   optimizer: AdamW 
   ignore_label: 255
-  gpu_ids: [0, 1]
+  train_gpu: [0]
   workers: 8  # data loader workers
   base_lr: 0.00005
   epochs: 100
@@ -64,7 +64,7 @@ TRAIN:
   print_freq: 1
   save_freq: 1
   save_path: ./saved_models # Fill the path to store the trained model
-  weight: "/sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/processed/s30_1w5s/model_best.pth"
+  weight: "./saved_models/outdoor/model_outdoor_s0/model_best.pth"
   resume:  # path to latest checkpoint (default: none)
   evaluate: True  # evaluate on validation set, extra gpu memory needed and small batch_size_val is recommend
   eval_freq: 1
@@ -77,15 +77,16 @@ Few-shot:
   num_episode_per_comb: 100
   pretrain_backbone: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/S3DIS/pretrained_backbone_weights/s3_s1pre_1/s3_s1pre
   n_subprototypes: 100
-  vis: 0
-  vis_freq: 10  # Jede 10. Episode visualisieren (0 = nie)
-  vis_start_episode: 0  # Ab Episode 0 starten
-  forvis: 1
+
+  vis: 
+  forvis: 0
   vis_save_path: './vis/outdoor'
-  target_class: 1
+  target_class: CircularTrafficSign
+  vis_freq: 1 #new wandb parameter
+  vis_start_episode: 0 #new wandb parameter
 
 Distributed:
-  dist_url: 
+  dist_url: tcp://127.0.0.1:6789
   dist_backend: 'nccl'
   multiprocessing_distributed: True
   world_size: 1
