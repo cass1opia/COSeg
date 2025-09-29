@@ -1,0 +1,15 @@
+{
+  "config_path": "config/essen_outdoor_COSeg_fs.yaml",
+  "num_epochs_tested": 3,
+  "episodes_per_epoch": 2,
+  "train_loader_episodes": 400,
+  "test_loader_episodes": 400,
+  "args": {
+    "data_name": "essen_outdoor",
+    "data_root": "/sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/street-signs",
+    "n_way": 1,
+    "k_shot": 1,
+    "n_queries": 1,
+    "cvfold": 1
+  }
+}

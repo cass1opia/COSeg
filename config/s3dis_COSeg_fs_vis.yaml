@@ -1,9 +1,7 @@
 DATA:
-  data_name: outdoor
-  save_path: "/sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/processed/stats/"
-  data_root: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/processed/blocks_bs5.0_s5.0/data
-  cache_dir: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/cache
-  classes: 10
+  data_name: s3dis
+  data_root: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/S3DIS/Stanford3dDataset_v1.2_Aligned_Version/scenes/data
+  classes: 13
   fea_dim: 6
   voxel_size: 0.02
   voxel_max: 20480
@@ -49,8 +47,8 @@ TRAIN:
   use_amp: True
   optimizer: AdamW 
   ignore_label: 255
-  gpu_ids: [0, 1]
-  workers: 8  # data loader workers
+  train_gpu: [0, 1]
+  workers: 16  # data loader workers
   base_lr: 0.00005
   epochs: 100
   start_epoch: 0
@@ -64,7 +62,7 @@ TRAIN:
   print_freq: 1
   save_freq: 1
   save_path: ./saved_models # Fill the path to store the trained model
-  weight: "/sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/essen-road/processed/s30_1w5s/model_best.pth"
+  weight:  /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/S3DIS/pretrained_weights/model/model_best.pth
   resume:  # path to latest checkpoint (default: none)
   evaluate: True  # evaluate on validation set, extra gpu memory needed and small batch_size_val is recommend
   eval_freq: 1
@@ -72,20 +70,18 @@ TRAIN:
 Few-shot:
   num_episode: 400
   n_way: 1
-  k_shot: 5
+  k_shot: 1
   n_queries: 1
-  num_episode_per_comb: 100
+  num_episode_per_comb: 1000
   pretrain_backbone: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/S3DIS/pretrained_backbone_weights/s3_s1pre_1/s3_s1pre
   n_subprototypes: 100
   vis: 0
-  vis_freq: 10  # Jede 10. Episode visualisieren (0 = nie)
-  vis_start_episode: 0  # Ab Episode 0 starten
   forvis: 1
-  vis_save_path: './vis/outdoor'
-  target_class: 1
+  vis_save_path: ./vis
+  target_class: table
 
 Distributed:
-  dist_url: 
+  dist_url: tcp://127.0.0.1:6789
   dist_backend: 'nccl'
   multiprocessing_distributed: True
   world_size: 1
@@ -93,4 +89,5 @@ Distributed:
 
 TEST:
   test: True
-  eval_split: test # split for eval in [val or test], should be set to 'test' if test is True
+  eval_split: val # split for eval in [val or test], should be set to 'test' if test is True
+

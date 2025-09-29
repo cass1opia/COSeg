@@ -864,6 +864,12 @@ class Stratified(nn.Module):
             offset_stack.append(offset)
             feats, xyz, offset = self.downsample(feats, xyz, offset)
 
+        # Initialize gt and query_base_y if they are None
+        if gt is None:
+            gt = torch.zeros(feats.shape[0], dtype=torch.long, device=feats.device)
+        if query_base_y is None:
+            query_base_y = torch.zeros(feats.shape[0], dtype=torch.long, device=feats.device)
+
         for i, layer in enumerate(self.layers):
             (
                 feats,

@@ -1,4 +1,5 @@
 import os
+from typing import Dict
 import numpy as np
 
 import torch
@@ -45,13 +46,28 @@ class Outdoor_base(Dataset):
 
         class_names = open(essen_classnames_path).readlines()
 
-        self.class2type = {
-            i+1: name.strip() for i, name in enumerate(class_names) if name.strip()
+        
+
+        CLASS_ID_TO_NAME: Dict[int, str] = {
+            1: "StreetSign",
+            3: "CircularTrafficSign", 
+            4: "OctagonalTrafficSign",
+            5: "RectangularTrafficSign",
+            6: "TriangularTrafficSign",
+            7: "DirectionSign",
+            8: "FlippedTriangularTrafficSign",
+            9: "PriorityRoad",
+            11: "Zone",
+            13: "DistanceMarker",
         }
+        # self.class2type = {
+        #     i+1: name.strip() for i, name in enumerate(class_names) if name.strip()
+        # }
+        self.class2type = CLASS_ID_TO_NAME
+        
         self.type2class = {self.class2type[t]: t for t in self.class2type}
         
         self.fold_0 = [
-            "TrafficSign",
             "CircularTrafficSign",
             "OctagonalTrafficSign",
             "RectangularTrafficSign",
@@ -63,9 +79,7 @@ class Outdoor_base(Dataset):
             "StreetSign", 
             "FlippedTriangularTrafficSign",
             "PriorityRoad",
-            "OneWayStreet", 
             "Zone",
-            "Exit",
             "DistanceMarker"
         ]
 
@@ -379,12 +393,16 @@ class Outdoor_FS(Outdoor_base):
         black_list = (
             []
         )  # to store the sampled scan names, in order to prevent sampling one scan several times...
+        valid_classes = []
+        
         for sampled_class in sampled_classes:
             all_scannames = self.class2scans[sampled_class].copy()
             if(len(all_scannames) < self.k_shot + self.n_queries):
                 print(f"Warning: Not enough scans for class {sampled_class}. "
                       f"Available: {len(all_scannames)}, Required: {self.k_shot + self.n_queries}")
                 continue
+            
+            valid_classes.append(sampled_class)
             selected_scannames = np.random.choice(
                 all_scannames, self.k_shot + self.n_queries, replace=False
             )
@@ -406,6 +424,15 @@ class Outdoor_FS(Outdoor_base):
                 support_ptclouds.append(ptcloud)
                 support_base_masks.append(base_label)
                 support_test_masks.append(test_label)
+
+        # If no valid classes were found, try to sample again with different classes
+        if len(valid_classes) == 0:
+            print(f"Warning: No valid classes found for episode {idx}. Trying to resample...")
+            # Try with different random classes
+            alternative_classes = np.random.choice(
+                self.classes, min(self.n_way, len(self.classes)), replace=False
+            )
+            return self.__getitem__(idx, alternative_classes)
 
         return (
             support_ptclouds,

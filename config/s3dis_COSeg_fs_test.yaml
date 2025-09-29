@@ -47,7 +47,7 @@ TRAIN:
   use_amp: True
   optimizer: AdamW 
   ignore_label: 255
-  train_gpu: [0, 1, 2, 3]
+  train_gpu: [0]
   workers: 16  # data loader workers
   base_lr: 0.00005
   epochs: 100
@@ -69,16 +69,19 @@ TRAIN:
 
 Few-shot:
   num_episode: 400
+  
   n_way: 1
   k_shot: 5
   n_queries: 1
-  num_episode_per_comb: 200
+  num_episode_per_comb: 100
   pretrain_backbone: /sc/projects/sci-doellner/chair/adrian.schmidt/coseg_data/S3DIS/pretrained_backbone_weights/s3_s1pre_1/s3_s1pre
   n_subprototypes: 100
   vis: 0
   forvis: 0
   vis_save_path:
   target_class: table
+  vis_freq: 10 #new wandb parameter
+  vis_start_episode: 0 #new wandb parameter
 
 Distributed:
   dist_url: tcp://127.0.0.1:6789

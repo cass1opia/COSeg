@@ -10,6 +10,8 @@ import numpy as np
 import argparse
 import shutil
 import copy
+import csv
+from datetime import datetime
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -41,6 +43,10 @@ from util.lr import MultiStepWithWarmup, PolyLR
 from util.common_util import load_pretrain_checkpoint, evaluate_metric
 from model.coseg import COSeg
 import wandb
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import re
 
 
 def get_parser():
@@ -140,9 +146,19 @@ def main_worker(gpu, ngpus_per_node, argss):
         logger = get_logger(args.save_path)
         writer = SummaryWriter(args.save_path)
         if args.vis:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+            # Bestimme Split aus dem CV-Fold (s0/s1/...)
+            split_tag = ""
+            if hasattr(args, "cvfold"):
+                try:
+                    split_tag = f"s{int(args.cvfold)}"
+                except Exception:
+                    split_tag = f"s{args.cvfold}"
+            run_name = f"{args.data_name}_{split_tag}_{args.n_way}way_{args.k_shot}shot_{timestamp}"
+            
             wandb.init(
                 project="COSeg",
-                name=os.path.basename(args.save_path),
+                name=run_name,
                 config=args,
             )
 
@@ -368,7 +384,7 @@ def main_worker(gpu, ngpus_per_node, argss):
     )
 
     if args.test:
-        validate(val_loader, model, valid_calsses)
+        validate(val_loader, model, list(val_data.classes))
         if main_process():
             writer.close()
             logger.info("==>Test done!")
@@ -624,7 +640,7 @@ def main_worker(gpu, ngpus_per_node, argss):
         is_best = False
         if args.evaluate and (epoch_log % args.eval_freq == 0):
             loss_val, mIoU_val, mAcc_val, allAcc_val = validate(
-                val_loader, model, valid_calsses
+                val_loader, model, list(val_data.classes)
             )
             if main_process():
                 writer.add_scalar("loss_val", loss_val, epoch_log)
@@ -639,7 +655,13 @@ def main_worker(gpu, ngpus_per_node, argss):
                 os.makedirs(args.save_path + "/model/")
             filename = args.save_path + "/model/model_last.pth"
             logger.info("Saving checkpoint to: " + filename)
-            torch.save({"state_dict": model.state_dict()}, filename)
+            torch.save({
+                "epoch": epoch_log,
+                "state_dict": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "scheduler": scheduler.state_dict(),
+                "best_iou": best_iou
+            }, filename)
             if is_best:
                 logger.info("Is best")
                 shutil.copyfile(
@@ -717,6 +739,36 @@ def train(
         intersection, union, target = evaluate_metric(
             output, query_y, sampled_classes, train_calsses, args.ignore_label
         )
+        
+        # Logge Klasseninformationen für diese Training-Episode
+        if main_process() and args.vis:
+            # Konvertiere Klassen-IDs zu Namen für Outdoor-Dataset
+            CLASS_ID_TO_NAME = {
+                1: "StreetSign",
+                3: "CircularTrafficSign", 
+                4: "OctagonalTrafficSign",
+                5: "RectangularTrafficSign",
+                6: "TriangularTrafficSign",
+                7: "DirectionSign",
+                8: "FlippedTriangularTrafficSign",
+                9: "PriorityRoad",
+                11: "Zone",
+                13: "DistanceMarker",
+            }
+            
+            episode_class_names = []
+            for class_id in sampled_classes:
+                class_name = CLASS_ID_TO_NAME.get(class_id, f"Class_{class_id}")
+                episode_class_names.append(class_name)
+            
+            combined_class_name = "_".join(episode_class_names)
+            
+            wandb.log({
+                "train/episode_classes": combined_class_name,
+                "train/episode_class_ids": sampled_classes.tolist(),
+                "train/batch": i + 1,
+                "train/episode_num_classes": len(episode_class_names)
+            }, commit=False)
         if args.multiprocessing_distributed:
             dist.all_reduce(intersection), dist.all_reduce(
                 union
@@ -814,6 +866,13 @@ def validate(val_loader, model, valid_calsses):
     intersection_meter = AverageMeter()
     union_meter = AverageMeter()
     target_meter = AverageMeter()
+    
+    # CSV-Daten sammeln
+    csv_data = []
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    
+    filename_prefix = f"{args.data_name}_S_{args.cvfold}_N_{args.n_way}_K_{args.k_shot}_test_episodes_{args.num_episode_per_comb}_pts_{args.voxel_max}_vs_{args.voxel_size:.2f}"
 
     if args.forvis:
         target_class = val_loader.dataset.target_class
@@ -823,6 +882,30 @@ def validate(val_loader, model, valid_calsses):
     torch.cuda.empty_cache()
     model.eval()
     end = time.time()
+    # Mapping von Klassen-ID zu Index in valid_calsses
+    class_id_to_index = {int(cid): idx for idx, cid in enumerate(valid_calsses)}
+    # Mapping Klassen-ID -> Name (Outdoor spezifisch; Fallback auf Class_{id})
+    CLASS_ID_TO_NAME_LOG = {
+        1: "StreetSign",
+        3: "CircularTrafficSign",
+        4: "OctagonalTrafficSign",
+        5: "RectangularTrafficSign",
+        6: "TriangularTrafficSign",
+        7: "DirectionSign",
+        8: "FlippedTriangularTrafficSign",
+        9: "PriorityRoad",
+        11: "Zone",
+        13: "DistanceMarker",
+    }
+    # Sammler: per-Klasse Verteilungen der Episoden-IoU und -Accuracy
+    per_class_iou_values = {int(cid): [] for cid in valid_calsses}
+    per_class_acc_values = {int(cid): [] for cid in valid_calsses}
+    # Tracker für beste/schlechteste Episode pro Klasse (nach IoU)
+    best_iou_per_class = np.full(len(valid_calsses), -1.0, dtype=np.float64)
+    worst_iou_per_class = np.full(len(valid_calsses), 2.0, dtype=np.float64)
+    # Listen der Episoden-Indices (1-basiert), die den Best-/Worstwert erreichen
+    best_eps_per_class = [[] for _ in range(len(valid_calsses))]
+    worst_eps_per_class = [[] for _ in range(len(valid_calsses))]
     for i, batch in enumerate(val_loader):
         if args.forvis:
             (
@@ -874,6 +957,36 @@ def validate(val_loader, model, valid_calsses):
         intersection, union, target = evaluate_metric(
             output, query_y, sampled_classes, valid_calsses, args.ignore_label
         )
+        
+        # Logge Klasseninformationen für diese Episode
+        if main_process() and args.vis:
+            # Konvertiere Klassen-IDs zu Namen für Outdoor-Dataset
+            CLASS_ID_TO_NAME = {
+                1: "StreetSign",
+                3: "CircularTrafficSign", 
+                4: "OctagonalTrafficSign",
+                5: "RectangularTrafficSign",
+                6: "TriangularTrafficSign",
+                7: "DirectionSign",
+                8: "FlippedTriangularTrafficSign",
+                9: "PriorityRoad",
+                11: "Zone",
+                13: "DistanceMarker",
+            }
+            
+            episode_class_names = []
+            for class_id in sampled_classes:
+                class_name = CLASS_ID_TO_NAME.get(class_id, f"Class_{class_id}")
+                episode_class_names.append(class_name)
+            
+            combined_class_name = "_".join(episode_class_names)
+            
+            wandb.log({
+                "eval/episode_classes": combined_class_name,
+                "eval/episode_class_ids": sampled_classes.tolist(),
+                "eval/batch": i + 1,
+                "eval/episode_num_classes": len(episode_class_names)
+            }, commit=False)
 
         if args.forvis:
             query_name = scene_names[0]
@@ -911,6 +1024,36 @@ def validate(val_loader, model, valid_calsses):
             union.cpu().numpy(),
             target.cpu().numpy(),
         )
+        # Episoden-IoU/Accuracy pro Klasse berechnen und Tracker aktualisieren
+        iou_episode = intersection / (union + 1e-10)
+        acc_episode = intersection / (target + 1e-10)
+        # Update best/worst nur für Klassen, die in dieser Episode vorkommen
+        eps_idx = i + 1  # 1-basierter Index
+        present_indices = []
+        for c in sampled_classes:
+            c_int = int(c)
+            if c_int in class_id_to_index:
+                present_indices.append(class_id_to_index[c_int])
+        for cls_idx in present_indices:
+            val = float(iou_episode[cls_idx])
+            # Verteilungs-Sammler befüllen
+            cls_id = int(valid_calsses[cls_idx])
+            per_class_iou_values[cls_id].append(val)
+            per_class_acc_values[cls_id].append(float(acc_episode[cls_idx]))
+            # Bestwert
+            if val > best_iou_per_class[cls_idx] + 1e-6:
+                best_iou_per_class[cls_idx] = val
+                best_eps_per_class[cls_idx] = [eps_idx]
+            elif abs(val - best_iou_per_class[cls_idx]) <= 1e-6:
+                if (len(best_eps_per_class[cls_idx]) == 0) or (best_eps_per_class[cls_idx][-1] != eps_idx):
+                    best_eps_per_class[cls_idx].append(eps_idx)
+            # Schlechtester Wert
+            if val < worst_iou_per_class[cls_idx] - 1e-6:
+                worst_iou_per_class[cls_idx] = val
+                worst_eps_per_class[cls_idx] = [eps_idx]
+            elif abs(val - worst_iou_per_class[cls_idx]) <= 1e-6:
+                if (len(worst_eps_per_class[cls_idx]) == 0) or (worst_eps_per_class[cls_idx][-1] != eps_idx):
+                    worst_eps_per_class[cls_idx].append(eps_idx)
         intersection_meter.update(intersection), union_meter.update(
             union
         ), target_meter.update(target)
@@ -921,6 +1064,34 @@ def validate(val_loader, model, valid_calsses):
         loss_meter.update(loss.item(), n)
         batch_time.update(time.time() - end)
         end = time.time()
+        
+        # CSV-Daten für jeden Batch sammeln
+        csv_data.append({
+            'batch': i + 1,
+            'total_batches': len(val_loader),
+            'data_time_val': data_time.val,
+            'data_time_avg': data_time.avg,
+            'batch_time_val': batch_time.val,
+            'batch_time_avg': batch_time.avg,
+            'loss_val': loss_meter.val,
+            'loss_avg': loss_meter.avg,
+            'accuracy': accuracy,
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+        
+        # Wandb logging für Batch-Level-Daten
+        if main_process() and args.vis:
+            wandb.log({
+                "eval/batch": i + 1,
+                "eval/data_time_val": data_time.val,
+                "eval/data_time_avg": data_time.avg,
+                "eval/batch_time_val": batch_time.val,
+                "eval/batch_time_avg": batch_time.avg,
+                "eval/loss_val": loss_meter.val,
+                "eval/loss_avg": loss_meter.avg,
+                "eval/accuracy": accuracy
+            }, commit=True)
+        
         if (i + 1) % args.print_freq == 0 and main_process():
             logger.info(
                 "Test: [{}/{}] "
@@ -942,18 +1113,236 @@ def validate(val_loader, model, valid_calsses):
     mIoU = np.mean(iou_class)
     mAcc = np.mean(accuracy_class)
     allAcc = sum(intersection_meter.sum) / (sum(target_meter.sum) + 1e-10)
+    
+    # CSV-Datei schreiben
     if main_process():
+        # Erstelle Unterordner für diesen Testlauf
+        results_dir = os.path.join("stats", "results", filename_prefix)
+        os.makedirs(results_dir, exist_ok=True)
+        
+        # Batch-Level-Daten speichern
+        batch_csv_path = os.path.join(results_dir, f"batches_{timestamp}.csv")
+        
+        with open(batch_csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+            fieldnames = ['batch', 'total_batches', 'data_time_val', 'data_time_avg', 
+                         'batch_time_val', 'batch_time_avg', 'loss_val', 'loss_avg', 
+                         'accuracy', 'timestamp']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(csv_data)
+        
+        # Finale Ergebnisse speichern
+        final_csv_path = os.path.join(results_dir, f"results_{timestamp}.csv")
+        
+        with open(final_csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+            fieldnames = ['timestamp', 'mIoU', 'mAcc', 'allAcc', 'final_loss_avg', 
+                         'total_batches', 'valid_classes']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            
+            # Finale Ergebnisse
+            final_data = {
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'mIoU': mIoU,
+                'mAcc': mAcc,
+                'allAcc': allAcc,
+                'final_loss_avg': loss_meter.avg,
+                'total_batches': len(val_loader),
+                'valid_classes': ','.join(map(str, valid_calsses))
+            }
+            writer.writerow(final_data)
+            
+            # Klassen-spezifische Ergebnisse
+            for i in range(len(valid_calsses)):
+                class_data = {
+                    'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'mIoU': iou_class[i],
+                    'mAcc': accuracy_class[i],
+                    'allAcc': accuracy_class[i],  # Für Klassen ist allAcc = mAcc
+                    'final_loss_avg': loss_meter.avg,
+                    'total_batches': len(val_loader),
+                    'valid_classes': f"Class_{valid_calsses[i]}"
+                }
+                writer.writerow(class_data)
+        
+        logger.info(f"Test-Statistiken gespeichert in: {batch_csv_path} und {final_csv_path}")
+        
+        # Wandb logging für finale Evaluationsergebnisse
+        if args.vis:
+            wandb.log({
+                "eval/final_mIoU": mIoU,
+                "eval/final_mAcc": mAcc,
+                "eval/final_allAcc": allAcc,
+                "eval/final_loss_avg": loss_meter.avg,
+                "eval/total_batches": len(val_loader)
+            })
+            
+            # Klassen-spezifische Metriken zu wandb loggen
+            for i in range(len(valid_calsses)):
+                wandb.log({
+                    f"eval/class_{valid_calsses[i]}_iou": iou_class[i],
+                    f"eval/class_{valid_calsses[i]}_accuracy": accuracy_class[i]
+                })
+        
         logger.info(
             "Val result: mIoU/mAcc/allAcc {:.4f}/{:.4f}/{:.4f}.".format(
                 mIoU, mAcc, allAcc
             )
         )
         for i in range(len(valid_calsses)):
+            cid = int(valid_calsses[i])
+            cname = CLASS_ID_TO_NAME_LOG.get(cid, f"Class_{cid}")
             logger.info(
-                "Class_{} Result: iou/accuracy {:.4f}/{:.4f}.".format(
-                    valid_calsses[i], iou_class[i], accuracy_class[i]
+                "Class_{} ({}): iou/accuracy {:.4f}/{:.4f}.".format(
+                    valid_calsses[i], cname, iou_class[i], accuracy_class[i]
                 )
             )
+        # Beste/schlechteste Episoden pro Klasse loggen
+        for idx, cls in enumerate(valid_calsses):
+            best_eps_list = best_eps_per_class[idx]
+            worst_eps_list = worst_eps_per_class[idx]
+            cid = int(cls)
+            cname = CLASS_ID_TO_NAME_LOG.get(cid, f"Class_{cid}")
+            logger.info(
+                "Class_{} ({}) BestEpisodes: eps={} (IoU {:.4f}), WorstEpisodes: eps={} (IoU {:.4f}).".format(
+                    cls, cname,
+                    best_eps_list if len(best_eps_list) > 0 else [],
+                    best_iou_per_class[idx] if len(best_eps_list) > 0 else -1.0,
+                    worst_eps_list if len(worst_eps_list) > 0 else [],
+                    worst_iou_per_class[idx] if len(worst_eps_list) > 0 else -1.0,
+                )
+            )
+        # Aggregation: Worst-Episoden über alle Klassen
+        from collections import Counter
+        worst_counter = Counter()
+        for eps_list in worst_eps_per_class:
+            worst_counter.update(eps_list)
+        if len(worst_counter) > 0:
+            total_classes = len(valid_calsses)
+            sorted_worst = sorted(worst_counter.items(), key=lambda x: (-x[1], x[0]))
+            top_n = 20 if len(sorted_worst) > 20 else len(sorted_worst)
+            summary_items = [
+                f"{ep}: {cnt}/{total_classes} ({cnt/total_classes:.2%})" for ep, cnt in sorted_worst[:top_n]
+            ]
+            logger.info(
+                "Worst episodes across classes (Top {}): {}".format(
+                    top_n, ", ".join(summary_items)
+                )
+            )
+            # CSV: vollständige Aggregation speichern
+            results_dir = os.path.join("stats", "results", filename_prefix)
+            os.makedirs(results_dir, exist_ok=True)
+            agg_csv_path = os.path.join(results_dir, f"worst_episodes_aggregate_{timestamp}.csv")
+            with open(agg_csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+                fieldnames = ['episode', 'count', 'fraction']
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+                for ep, cnt in sorted_worst:
+                    writer.writerow({'episode': ep, 'count': cnt, 'fraction': cnt / total_classes})
+            logger.info(f"Worst-episoden-Aggregation gespeichert in: {agg_csv_path}")
+            # wandb Kurz-Zusammenfassung
+            if args.vis:
+                wandb.log({
+                    "eval/worst_episodes_unique": len(worst_counter),
+                    "eval/worst_episodes_max_count": max(worst_counter.values()),
+                })
+        # Optional: wandb-Logging
+        if args.vis:
+            log_payload = {}
+            for idx, cls in enumerate(valid_calsses):
+                log_payload[f"eval/class_{cls}_best_iou"] = float(best_iou_per_class[idx]) if len(best_eps_per_class[idx]) > 0 else -1.0
+                log_payload[f"eval/class_{cls}_best_episodes"] = ",".join(map(str, best_eps_per_class[idx])) if len(best_eps_per_class[idx]) > 0 else ""
+                log_payload[f"eval/class_{cls}_worst_iou"] = float(worst_iou_per_class[idx]) if len(worst_eps_per_class[idx]) > 0 else -1.0
+                log_payload[f"eval/class_{cls}_worst_episodes"] = ",".join(map(str, worst_eps_per_class[idx])) if len(worst_eps_per_class[idx]) > 0 else ""
+            wandb.log(log_payload)
+
+        # Verteilungen als Matplotlib-Histogramme speichern (mit Klassennamen)
+        hist_dir = os.path.join("stats", "histograms")
+        os.makedirs(hist_dir, exist_ok=True)
+        CLASS_ID_TO_NAME = {
+            1: "StreetSign",
+            3: "CircularTrafficSign",
+            4: "OctagonalTrafficSign",
+            5: "RectangularTrafficSign",
+            6: "TriangularTrafficSign",
+            7: "DirectionSign",
+            8: "FlippedTriangularTrafficSign",
+            9: "PriorityRoad",
+            11: "Zone",
+            13: "DistanceMarker",
+        }
+        def sanitize(name: str) -> str:
+            return re.sub(r"[^A-Za-z0-9_-]+", "_", name)
+
+        all_iou_series = []
+        all_acc_series = []
+        for cls in valid_calsses:
+            cls_int = int(cls)
+            cls_name = CLASS_ID_TO_NAME.get(cls_int, f"Class_{cls_int}")
+            file_stub = sanitize(cls_name)
+            iou_vals = per_class_iou_values.get(cls_int, [])
+            acc_vals = per_class_acc_values.get(cls_int, [])
+            if len(iou_vals) > 0:
+                plt.figure()
+                plt.hist(iou_vals, bins=20, range=(0.0, 1.0))
+                plt.title(f"{cls_name} iou hist")
+                plt.xlabel("IoU")
+                plt.ylabel("episodes")
+                plt.tight_layout()
+                plt.savefig(os.path.join(hist_dir, f"{file_stub}_iou_hist.png"))
+                plt.close()
+                all_iou_series.append((cls_name, iou_vals))
+            if len(acc_vals) > 0:
+                plt.figure()
+                plt.hist(acc_vals, bins=20, range=(0.0, 1.0))
+                plt.title(f"{cls_name} acc hist")
+                plt.xlabel("Accuracy")
+                plt.ylabel("episodes")
+                plt.tight_layout()
+                plt.savefig(os.path.join(hist_dir, f"{file_stub}_acc_hist.png"))
+                plt.close()
+                all_acc_series.append((cls_name, acc_vals))
+
+        # Sammelplot: alle IoU-Histogramme
+        if len(all_iou_series) > 0:
+            plt.figure()
+            for name, values in all_iou_series:
+                plt.hist(values, bins=20, range=(0.0, 1.0), alpha=0.35, label=name, histtype='stepfilled')
+            plt.title("All classes IoU hist")
+            plt.xlabel("IoU")
+            plt.ylabel("episodes")
+            plt.legend(fontsize=8, loc='upper right', ncol=1)
+            plt.tight_layout()
+            plt.savefig(os.path.join(hist_dir, "all_iou_hist.png"))
+            plt.close()
+
+        # Sammelplot: alle Accuracy-Histogramme
+        if len(all_acc_series) > 0:
+            plt.figure()
+            for name, values in all_acc_series:
+                plt.hist(values, bins=20, range=(0.0, 1.0), alpha=0.35, label=name, histtype='stepfilled')
+            plt.title("All classes Accuracy hist")
+            plt.xlabel("Accuracy")
+            plt.ylabel("episodes")
+            plt.legend(fontsize=8, loc='upper right', ncol=1)
+            plt.tight_layout()
+            plt.savefig(os.path.join(hist_dir, "all_acc_hist.png"))
+            plt.close()
+
+        # Sammelplot: IoU und Accuracy zusammen
+        if (len(all_iou_series) > 0) or (len(all_acc_series) > 0):
+            plt.figure()
+            for name, values in all_iou_series:
+                plt.hist(values, bins=20, range=(0.0, 1.0), alpha=0.25, label=f"{name} IoU", histtype='stepfilled')
+            for name, values in all_acc_series:
+                plt.hist(values, bins=20, range=(0.0, 1.0), alpha=0.25, label=f"{name} Acc", histtype='stepfilled')
+            plt.title("All classes IoU + Acc hist")
+            plt.xlabel("Metric value")
+            plt.ylabel("episodes")
+            plt.legend(fontsize=7, loc='upper right', ncol=1)
+            plt.tight_layout()
+            plt.savefig(os.path.join(hist_dir, "all_iou_acc_hist.png"))
+            plt.close()
         logger.info("<<<<<<<<<<<<<<<<< End Evaluation <<<<<<<<<<<<<<<<<")
 
     return loss_meter.avg, mIoU, mAcc, allAcc

@@ -1,0 +1,29 @@
+dependencies: 
+  - cudatoolkit 11.3.*
+  - numba
+  - numpy
+  - python >=3.8,<3.9.0a0
+  - pytorch 1.11.*
+  - scikit-learn
+
+
+torch-points-kernels 0.7.1 py38_torch_1.11.0_cu113
+--------------------------------------------------
+file name   : torch-points-kernels-0.7.1-py38_torch_1.11.0_cu113.tar.bz2
+name        : torch-points-kernels
+version     : 0.7.1
+build       : py38_torch_1.11.0_cu113
+build number: 0
+size        : 13.3 MB
+license     : MIT
+subdir      : linux-64
+url         : https://conda.anaconda.org/torch-points3d/linux-64/torch-points-kernels-0.7.1-py38_torch_1.11.0_cu113.tar.bz2
+md5         : 5037f6e4c41adc713201b8725bb02889
+timestamp   : 2022-07-15 20:51:56 UTC
+dependencies: 
+  - cudatoolkit 11.3.*
+  - numba
+  - numpy
+  - python >=3.8,<3.9.0a0
+  - pytorch 1.11.*
+  - scikit-learn
